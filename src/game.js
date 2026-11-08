@@ -977,11 +977,39 @@ export class Game {
     }
     const yaw = s.heading + this.helmYaw;
     const dist = 15 + this.helmPitch * 4 + this.combatK * 5, hgt = 4.2 + this.helmPitch * 9 + this.combatK * 2.5;
-    _v.set(s.pos.x + Math.sin(yaw) * dist, s.pos.y + hgt, s.pos.z + Math.cos(yaw) * dist);
-    this.camPos.lerp(_v, 1 - Math.exp(-dt * 7));
+    const targetX = s.pos.x - Math.sin(s.heading) * 3 * (1 - this.combatK * 0.32) + dxE * this.combatK * 0.32;
+    const targetZ = s.pos.z - Math.cos(s.heading) * 3 * (1 - this.combatK * 0.32) + dzE * this.combatK * 0.32;
+    const targetY = Math.max(s.pos.y + 3.4, this.world.topSolid(Math.floor(targetX), Math.floor(targetZ)) + 2.5);
+    const candidates = [
+      [yaw, dist, hgt], [yaw - 0.55, dist, hgt], [yaw + 0.55, dist, hgt],
+      [yaw, dist * 0.72, hgt + 3], [yaw - 0.8, dist * 0.72, hgt + 3], [yaw + 0.8, dist * 0.72, hgt + 3],
+      [yaw, dist * 0.62, hgt + 8],
+    ];
+    let best = null, bestScore = Infinity;
+    for (const [angle, back, lift] of candidates) {
+      const cx = clamp(s.pos.x + Math.sin(angle) * back, 2, W - 3);
+      const cz = clamp(s.pos.z + Math.cos(angle) * back, 2, D - 3);
+      let cy = s.pos.y + lift;
+      const length = Math.hypot(cx - targetX, cy - targetY, cz - targetZ);
+      const steps = Math.max(2, Math.ceil(length * 2));
+      let requiredRaise = 0;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const x = targetX + (cx - targetX) * t, y = targetY + (cy - targetY) * t, z = targetZ + (cz - targetZ) * t;
+        const ground = this.world.topSolid(Math.floor(x), Math.floor(z)) + 1.5;
+        requiredRaise = Math.max(requiredRaise, (ground - y) / t);
+      }
+      const raise = Math.max(0, requiredRaise + 1.5);
+      cy += raise;
+      const score = Math.abs(back - dist) + Math.abs(angle - yaw) * 2 + raise * 2;
+      if (score < bestScore) { bestScore = score; best = { x: cx, y: cy, z: cz }; }
+      if (raise < 3) break;
+    }
+    if (best) _v.set(best.x, best.y, best.z);
+    if (this.helmCamReset) { this.camPos.copy(_v); this.helmCamReset = false; }
+    else this.camPos.lerp(_v, 1 - Math.exp(-dt * 7));
     cam.position.copy(this.camPos);
-    const k = this.combatK * 0.32;
-    cam.lookAt(s.pos.x - Math.sin(s.heading) * 3 * (1 - k) + dxE * k, s.pos.y + 3.4, s.pos.z - Math.cos(s.heading) * 3 * (1 - k) + dzE * k);
+    cam.lookAt(targetX, targetY, targetZ);
   }
   thirdCamera(dt) {
     const P = this.player, cam = this.camera;
@@ -1538,7 +1566,7 @@ export class Game {
       if (this.net.inCrew) this.net.takeHelm();
       P.mode = 'helm';
       this.helmYaw = 0; this.helmPitch = 0.3;
-      this.camPos.copy(this.camera.position);
+      this.helmCamReset = true;
       this.sfx.thud();
       if (!this.hints.helm) {
         this.hints.helm = 1;

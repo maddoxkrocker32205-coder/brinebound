@@ -1,6 +1,6 @@
 # Brinebound: hand-off guide
 
-Version 0.6.18. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
+Version 0.6.19. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
 
 ## Starter prompt
 
@@ -63,7 +63,7 @@ To work on it with live files instead, serve the project folder with any static 
 | `src/character.js` | Captain and sailor models, poses and animation, held items, the first-person arm, portraits. |
 | `src/assets/human-base-rigged.glb`, `src/assets/ATTRIBUTION.txt` | CC0 human base mesh and its source/license record. The Node and Python builds embed the model in the single-page game. |
 | `src/input.js` | Keyboard, mouse (pointer lock), touch (joystick, look pad, buttons) and standard-layout gamepads such as DualSense. |
-| `src/ship.js` | Ship hulls, deck layout in ship-local coordinates, sailing physics, collisions with land (`groundContact`) and the hull circles other ships hit (`hullCircles`), cannons and broadsides, damage and sinking. The plan is drawn for a ship of size 1 (`SHIP1`, `GUNS1`, `floorAt1`...); every ship is built `SCALE` (2) times bigger, and the hold floor, walkable bounds and bilge shape must stay aligned with the full-size plan the player walks. |
+| `src/ship.js` | Ship hulls, deck layout in ship-local coordinates, sailing physics, collisions with land (`groundContact`) and the hull circles other ships hit (`hullCircles`), cannons and broadsides, damage and sinking. The plan is drawn for a ship of size 1 (`SHIP1`, `GUNS1`, `floorAt1`...); every ship is built `SCALE` (2) times bigger, and the hold floor, walkable bounds and bilge shape must stay aligned with the full-size plan the player walks. Sail cloth dimensions are defined by `sailGeo` and the sail's anchor stays aligned with its yard. |
 | `src/fleet.js` | Other ships at sea and their sailing AI, notoriety with the navy. |
 | `src/crews.js` | NPC sailors on other ships: posts, alerts, fighting boarders, the strongbox when the ship is taken. |
 | `src/enemies.js` | Hollowmen and skeleton camps, plus the hollow ships' attack AI. |
@@ -143,6 +143,7 @@ The game was built and published inside the Claude app, which gives the page a `
 
 - **0.6.17:** reshaped the underwater island shelves to slope gradually from shore to the shared bedrock floor, removing the abrupt seabed edge.
 - **0.6.18:** added standard-layout gamepad support, including DualSense twin-stick movement and aiming, action buttons and triggers, controller menu navigation, and a title-screen control guide.
+- **0.6.19:** made the helm camera choose terrain-clear viewpoints near islands and reset immediately when taking the helm; raised the mainsail's lower edge to improve forward visibility.
 - **0.6.16:** doubled the map area by expanding it to 1632 x 1632 blocks, added 23 Outer Reach islands and expedition side quests that require visiting a new island and reporting back. Older 0.6 saves remap their terrain edits into the expanded map while retaining the old islands and player position.
 - **0.6.15:** rebuilt the stern transom as continuous outward-facing hull panels to close a see-through gap across the back of the ship.
 - **0.6.14:** widened and lengthened the hold floor, added plank seams and fasteners, matched bilge collision to the wider hull, and added paused-menu shortcuts for customization, quests and an expandable chart.

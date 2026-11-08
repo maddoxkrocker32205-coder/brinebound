@@ -551,7 +551,7 @@ export class Ship {
     mask.renderOrder = 1;
     this.body.add(mask);
     const sailMat = new THREE.MeshLambertMaterial({ map: sailTexture(pal.sail, pal.emblem, kind === 'hollow', 3), side: THREE.DoubleSide, transparent: kind === 'hollow', alphaTest: kind === 'hollow' ? 0.4 : 0 });
-    this.sail = new THREE.Mesh(sailGeo(4.9, 6.0), sailMat);
+    this.sail = new THREE.Mesh(sailGeo(4.9, 4.8), sailMat);
     this.sail.position.set(0, 9.0, -0.85); this.sail.castShadow = true;
     this.body.add(this.sail);
     const jg = new THREE.BufferGeometry();
