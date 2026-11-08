@@ -1,0 +1,10 @@
+{
+  // New terminals in this folder open Command Prompt on Windows, so npm works without changing PowerShell's policy.
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "files.eol": "\n",
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  // Built and generated files: kept out of search (and out of AI assistants' way)
+  "search.exclude": { "dist/**": true, "docs/**": true, "exports/**": true, "node_modules/**": true, "unity/Audio/**": true },
+  "files.watcherExclude": { "dist/**": true, "docs/**": true, "exports/**": true, "node_modules/**": true }
+}

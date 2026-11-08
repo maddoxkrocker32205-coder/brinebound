@@ -1,0 +1,23 @@
+{
+  "name": "brinebound",
+  "version": "1.0.0",
+  "description": "Brinebound: a first-person pirate sandbox in one web page (three.js).",
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/dev.mjs",
+    "build": "node build.mjs && node build.mjs --offline",
+    "publish": "node tools/publish.mjs",
+    "test": "echo \"Browser tests: see tests/ and HANDOFF.md (Python + Playwright)\""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "qrcode-terminal": "^0.12.0",
+    "three": "^0.170.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

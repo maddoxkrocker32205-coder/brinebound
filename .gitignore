@@ -1,0 +1,7 @@
+node_modules/
+dist/
+exports/
+unity/Audio/
+tests/shots/
+tests/logs_*.txt
+__pycache__/

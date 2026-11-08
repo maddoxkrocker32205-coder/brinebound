@@ -1,0 +1,5 @@
+Human base mesh with editable 53-bone rig
+Source: https://www.innerscene.com/tools/library/3d-parts/human-base-mesh-with-editable-53-bone-rig-8e7c8ab1
+License: CC0 1.0 Universal (public domain)
+Based on MakeHuman/MPFB CC0 body, rig, and skin assets; library modifications by Innerscene.
+The model is adapted in Brinebound with pirate clothing, materials, strand-based hair and facial hair, eye details, accessories, and animation.

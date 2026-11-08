@@ -1,0 +1,38 @@
+{
+  // Terminal > Run Task... lists these. Ctrl+Shift+B starts the game with live reload.
+  // On Windows they run through Command Prompt, so PowerShell's script policy can't block npm.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Brinebound: install (first time)",
+      "type": "shell",
+      "command": "npm install",
+      "windows": { "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
+      "problemMatcher": []
+    },
+    {
+      "label": "Brinebound: play (live reload)",
+      "type": "shell",
+      "command": "npm run dev",
+      "windows": { "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Brinebound: publish to docs/ (for your iPhone)",
+      "type": "shell",
+      "command": "npm run publish",
+      "windows": { "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
+      "problemMatcher": []
+    },
+    {
+      "label": "Brinebound: build both files (dist/)",
+      "type": "shell",
+      "command": "npm run build",
+      "windows": { "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
+      "problemMatcher": []
+    }
+  ]
+}
