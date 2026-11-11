@@ -109,6 +109,8 @@ export class UI {
     tap('bBag', () => G.openSheet('bag'));
     tap('bMenu', () => G.openSheet('menu'));
     tap('tView', () => G.toggleView());
+    tap('guideNext', () => G.advanceTutorial());
+    tap('guideSkip', () => G.skipTutorial());
     const hold = (id, action) => {
       const el = $(id);
       el.addEventListener('pointerdown', (e) => { e.preventDefault(); G.input.press(action); G.input.hold(action, true); el.classList.add('down'); });
@@ -217,6 +219,9 @@ export class UI {
       const deg = (Math.atan2(wx * hc - wz * hs, -(wx * hs + wz * hc)) * 180) / Math.PI;
       this.css('wind', $('sWind'), 'transform', `rotate(${deg.toFixed(0)}deg)`);
       this.txt('windT', $('sWindTxt'), s.wf > 0.85 ? 'Fair' : s.wf > 0.6 ? 'Beam' : 'Head');
+      this.txt('shipKeys', $('shipKeys'), G.input.gamepadId !== null
+        ? 'Left stick: sails/steer · L2/R2: fire · □: leave helm'
+        : 'W/S sails · A/D steer · Q/E fire · R repair · F leave helm');
       this.hidden('shipKeys', $('shipKeys'), P.mode !== 'helm' || G.isTouch);
     }
     // enemy bar: nearest hollow ship, or the kraken
@@ -229,7 +234,7 @@ export class UI {
     } else {
       let best = null;
       for (const h of G.hollows) { if (h.sinking) continue; const d = Math.hypot(h.pos.x - P.pos.x, h.pos.z - P.pos.z); if (d < 90 && (!best || d < best.d)) best = { h, d }; }
-      if (best) { ename = best.h.kind !== 'hollow' ? best.h.name : best.h.variant === 'flagship' ? 'The Hollow Flagship' : 'The Hollow Wake'; efrac = best.h.hp / best.h.maxHp; }
+      if (best) { ename = best.h.kind !== 'hollow' ? `${best.h.design.label} · ${best.h.name}` : best.h.variant === 'flagship' ? 'The Hollow Flagship' : 'The Hollow Wake'; efrac = best.h.hp / best.h.maxHp; }
     }
     this.hidden('enemyP', $('enemyPanel'), !ename);
     if (ename) { this.txt('ename', $('eName'), ename); this.css('ehp', $('eHpFill'), 'width', (efrac * 100).toFixed(0) + '%'); }
@@ -277,9 +282,10 @@ export class UI {
     // prompt + touch use button
     const it = G.interaction;
     const promptText = G.needsClick ? 'Click the game to look around' : it && P.mode !== 'helm' ? it.label : '';
-    this.hidden('prompt', $('prompt'), !promptText || G.isTouch);
-    if (promptText && !G.isTouch) {
-      const key = G.needsClick ? '' : 'F';
+    const usingGamepad = G.input.gamepadId !== null;
+    this.hidden('prompt', $('prompt'), !promptText || (G.isTouch && !usingGamepad));
+    if (promptText && (!G.isTouch || usingGamepad)) {
+      const key = G.needsClick ? '' : G.input.promptControl('use');
       if (this.cache.prompt !== key + promptText) {
         this.cache.prompt = key + promptText;
         const el = $('prompt'); el.replaceChildren();
@@ -290,7 +296,7 @@ export class UI {
     if (G.isTouch) {
       const helm = P.mode === 'helm';
       this.hidden('tUse', $('tUse'), !it);
-      if (it) this.txt('tUseT', $('tUse'), it.short || it.label);
+      if (it) this.txt('tUseT', $('tUse'), `${usingGamepad ? G.input.promptControl('use') : 'Tap'} ${it.short || it.label}`);
       this.hidden('tPort', $('tPort'), !helm);
       this.hidden('tStar', $('tStar'), !helm);
       this.hidden('tHit', $('tHit'), helm);
@@ -304,6 +310,29 @@ export class UI {
       const item = G.hotbar[G.sel], food = item && ITEMS[item].food;
       this.txt('tPlaceT', $('tPlace'), food ? (item === 'grog' ? 'Drink' : 'Eat') : 'Place');
       this.txt('tViewT', $('tView'), G.camMode === 'third' ? '1st' : '3rd');
+    }
+    const step = G.hints.tutorialStep;
+    const guideOn = G.state === 'play' && P.alive && Number.isInteger(step) && step >= 0 && step < 6;
+    this.hidden('guide', $('guide'), !guideOn);
+    if (guideOn) {
+      const use = G.input.promptControl('use'), attack = G.input.promptControl('attack');
+      const controls = G.input.gamepadId !== null ? { use: `${use} Use`, attack: attack }
+        : G.isTouch ? { use: 'Tap Use', attack: 'Hit' }
+          : { use: `${use} Use`, attack: 'Left click' };
+      const guide = [
+        ['Movement & looking', G.input.gamepadId !== null ? 'Use the left stick to move and the right stick to look around.' : G.isTouch ? 'Move with the left joystick; drag the right side to look around.' : 'Move with W, A, S, D; move the mouse to look around.'],
+        ['Gather & interact', `Choose a tool on the hotbar. ${controls.attack} to swing; ${controls.use} to talk, board, or use what your prompt names.`],
+        ['Set sail', `Walk up the pier and ${controls.use} at your sloop’s wheel. At the helm, move forward/back to trim sail and left/right to steer.`],
+        ['Fight at sea', `At a cannon, look to aim and ${controls.attack} to fire. From the helm, use the port and starboard fire controls; watch your shot supply.`],
+        ['Keep your voyage', 'Open Menu, choose Save, then save to a numbered slot. Your autosave also updates as you play.'],
+        ['The sea is yours', 'Follow the compass and your chosen quest, gather what you need, and return to Brine Haven when you’re ready.'],
+      ];
+      const [title, body] = guide[step];
+      this.txt('guideStep', $('guideStep'), `FIRST VOYAGE · ${step + 1} OF 6`);
+      this.txt('guideTitle', $('guideTitle'), title);
+      this.txt('guideText', $('guideText'), body);
+      this.txt('guideNextText', $('guideNext'), step === 5 ? 'Finish' : 'Next');
+      this.txt('guideControls', $('guideControls'), G.input.gamepadId !== null ? 'D-pad → next · D-pad ↓ skip' : G.isTouch ? 'Tap Next to continue' : 'Continue with Next');
     }
     $('bQuests').classList.toggle('alert', G.quests.active.some((q) => q.state === 'ready'));
   }

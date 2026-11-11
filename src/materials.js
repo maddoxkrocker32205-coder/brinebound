@@ -4,7 +4,7 @@ import { EMIT_START } from './config.js';
 // One texture array + a small Lambert patch shared by terrain, plants, ships and characters.
 export const shared = { tex: null, detail: null, frond: null, time: { value: 0 } };
 
-export function voxelMaterial({ cutout = false, sway = false, side = THREE.FrontSide, emissive = 0x000000 } = {}) {
+export function voxelMaterial({ cutout = false, sway = false, side = THREE.DoubleSide, emissive = 0x000000 } = {}) {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side, emissive, roughness: 0.88, metalness: 0.025 });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTex = { value: shared.tex };
@@ -45,7 +45,7 @@ if (vLayer > ${EMIT_START}.0 - 0.5) totalEmissiveRadiance += texel.rgb * 1.15;`)
 export function terrainMaterial({ leaf = false } = {}) {
   // Ground is drawn on both sides: if the camera ever ends up inside the rock (a tight tunnel, the
   // third-person camera against a cliff) it sees the dark inside of the rock, never through the world.
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: leaf ? THREE.FrontSide : THREE.DoubleSide, roughness: leaf ? 0.84 : 0.97, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: leaf ? 0.84 : 0.97, metalness: 0 });
   if (!leaf) mat.shadowSide = THREE.BackSide;
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uDetail = { value: shared.detail };

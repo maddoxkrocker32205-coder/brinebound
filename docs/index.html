@@ -83,7 +83,7 @@ body.touch .chip kbd { display: none; }
 .chip .ci { display: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 
 #enemyPanel { position: absolute; top: calc(46px + var(--st)); left: 50%; transform: translateX(-50%); width: min(300px, 64vw); display: grid; gap: 4px; justify-items: center; }
-.ename { white-space: nowrap; font-family: var(--font-display); font-size: 24px; color: var(--sea-glass); text-shadow: 0 2px 0 rgba(0,0,0,.55); line-height: 1; }
+.ename { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); font-size: 24px; color: var(--sea-glass); text-shadow: 0 2px 0 rgba(0,0,0,.55); line-height: 1; }
 #enemyPanel .mtrack { width: 100%; border-color: rgba(124,196,176,.6); }
 #enemyPanel .mtrack i { background: var(--sea-glass); }
 
@@ -94,6 +94,13 @@ body.touch .chip kbd { display: none; }
 #ring { fill: none; stroke: var(--brass); stroke-width: 3; stroke-dasharray: 88; stroke-dashoffset: 88; }
 #prompt { position: absolute; left: 50%; top: calc(50% + 32px); transform: translateX(-50%); font-size: 18px; font-style: italic; padding: 4px 12px 6px; background: var(--ink-glass); white-space: nowrap; }
 #prompt kbd { font-style: normal; color: var(--brass); }
+#guide { position: absolute; left: 50%; bottom: calc(66px + var(--sb)); transform: translateX(-50%); width: min(420px, calc(100vw - 28px)); padding: 10px 14px 11px; display: grid; gap: 4px; background: linear-gradient(135deg, rgba(12,22,27,.94), rgba(22,39,43,.9)); border: 1px solid rgba(216,173,82,.6); border-top: 2px solid var(--brass); box-shadow: 0 6px 24px rgba(0,0,0,.32); pointer-events: auto; }
+#guideStep { font-family: var(--font-ui); font-size: 8px; letter-spacing: .08em; color: var(--sea-glass); }
+#guideTitle { font-family: var(--font-display); font-size: 23px; line-height: 1; color: var(--brass); }
+#guideText { font-size: 15px; line-height: 1.25; text-wrap: pretty; }
+#guideControls { font-family: var(--font-ui); font-size: 8px; color: rgba(236,224,195,.65); }
+#guide .row { justify-content: flex-end; gap: 6px; margin-top: 2px; }
+#guide .btn { min-height: 30px; padding: 5px 10px; font-size: 9px; }
 #stuckNote { position: absolute; left: 50%; top: calc(50% - 96px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 16px 10px; background: var(--ink-glass); font-style: italic; font-size: 17px; }
 #stuckNote .mtrack { width: 180px; }
 #stuckNote .mtrack i { transition: none; background: var(--brass); width: 0; }
@@ -332,6 +339,10 @@ textarea.code { width: 100%; height: 90px; font-family: var(--font-ui); font-siz
   .slot .count { font-size: 9px; right: 2px; bottom: 0; }
   #pickup { bottom: calc(52px + var(--sb)); }
   #crosshair { width: 32px; height: 32px; }
+  #guide { bottom: calc(58px + var(--sb)); padding: 8px 10px; gap: 3px; }
+  #guideTitle { font-size: 19px; }
+  #guideText { font-size: 13px; line-height: 1.2; }
+  #guide .btn { min-height: 27px; padding: 4px 8px; }
   #toasts { width: min(440px, 76vw); top: 30%; gap: 4px; }
   .toast { padding: 5px 14px 7px; } .toast strong { font-size: 22px; } .toast span { font-size: 13px; } .toast.chapter strong { font-size: 28px; }
   body.touch #chatLog { top: 34%; width: min(360px, 64vw); } #chatLog .cl { font-size: 13px; }
@@ -354,12 +365,14 @@ textarea.code { width: 100%; height: 90px; font-family: var(--font-ui); font-siz
   #mHp, #mFood, #gold { max-width: calc(50vw - min(75px, 17vw) - 14px - var(--sl)); }
   #goal { margin-top: 8px; }
   #tr { flex-direction: column; }
+  #guide { bottom: calc(198px + var(--sb)); }
   #toasts { top: 34%; }
 }
 /* held sideways: one band across the top, the cluster on the right, View and Emote beside the hotbar */
 @media (max-height: 520px) and (orientation: landscape) {
   #compass, #enemyPanel { width: min(220px, 30vw); }
   #tl { width: min(240px, calc(50vw - min(110px, 15vw) - 16px - var(--sl))); }
+  #guide { width: min(340px, 42vw); }
   #tView { bottom: calc(8px + var(--sb)); }
   #tEmote { left: calc(54px + var(--sl)); bottom: calc(8px + var(--sb)); }
   #toasts { width: min(420px, 42vw); top: 26%; }
@@ -408,6 +421,13 @@ textarea.code { width: 100%; height: 90px; font-family: var(--font-ui); font-siz
   <div id="enemyPanel" class="hidden"><span class="ename" id="eName">The Hollow Wake</span><span class="mtrack"><i id="eHpFill"></i></span></div>
   <div id="crosshair"><svg viewBox="0 0 40 40" aria-hidden="true"><circle id="ring" cx="20" cy="20" r="14"></circle></svg></div>
   <div id="prompt" class="hidden"></div>
+  <section id="guide" class="hidden" aria-live="polite" aria-label="First-voyage guide">
+    <span id="guideStep"></span>
+    <strong id="guideTitle"></strong>
+    <span id="guideText"></span>
+    <span id="guideControls"></span>
+    <div class="row"><button class="btn ghost" id="guideSkip" type="button">Skip guide</button><button class="btn" id="guideNext" type="button">Next</button></div>
+  </section>
   <div id="stuckNote" class="hidden"><span id="stuckText">Hold still</span><span class="mtrack"><i id="stuckFill"></i></span></div>
   <div id="toasts" aria-live="polite"></div>
   <div id="pickup"></div>
@@ -454,7 +474,7 @@ textarea.code { width: 100%; height: 90px; font-family: var(--font-ui); font-siz
     <p id="titleStatus">Charting the archipelago…</p>
     <p class="controller-hint">PS5 DualSense: pair it in iPhone Settings → Bluetooth, open this page in Safari, then press any controller button. Left stick move · right stick look · × jump · ○ crouch · □ use · △ view · R2 attack · L2 place/aim · L1/R1 change item · Options menu.</p>
     <p class="rotate-hint">Turn your phone sideways for a wider view.</p>
-    <p class="news"><b>NEW IN 0.6.19</b><br>Helm camera now chooses a clear view over nearby land and resets cleanly when you take the helm again; the mainsail is shorter so its foot sits higher and blocks less of the view ahead.<br><b>0.6.18</b> Play with a PS5 DualSense or other standard-layout gamepad: twin-stick movement and aiming, mapped buttons and triggers, controller navigation for menus, and an on-screen control guide.<br><b>0.6.17</b> Reshaped the underwater island shelves so the terrain descends gradually from each shore to the shared deep-sea bedrock floor, removing the abrupt drop at island edges.<br><b>0.6.16</b> Doubled the chart area from 1,152 to 1,632 blocks per side, added 23 outer islands for 46 total, and added Outer Reach expedition side quests. Existing 0.6 voyages keep their edits and position.<br><b>0.6.15</b> Rebuilt the stern transom as a continuous set of outward-facing hull panels, closing the see-through gap across the back of the ship.<br><b>0.6.14</b> Widened and lengthened the hold floor, added plank and fastener detail, fixed the bilge collision, and added quick links to customization, quests and an expandable sea chart.<br><b>0.6.13</b> Removed the camera-following seabed plane that showed up as a green moving surface at bedrock.<br><b>0.6.12</b> About four times more underground to mine, ending in an unbreakable bedrock floor. Older 0.6 voyages carry over their edits and player position.<br><b>0.6.11</b> Covered trouser seams, detailed cutlass and firearm models with corrected hand grips, and third-person camera collision against ship structures.<br><b>0.6.10</b> Facial hair now shades directly onto the face, with softer cheek-to-beard blending and fine stubble.<br><b>0.6.9</b> Fine strand-based hair and beard, a cleaner hairline, and visible iris and pupil details.<br><b>0.6.8</b> Rigged human models for the captain and sailors, outfitted as pirate, navy, merchant and hollow crews with age-of-sail gear.<br><b>0.6.7</b> Reworked captain and sailor models with smooth rounded forms, more natural facial detail, refined materials, and layered age-of-sail protection.<br><b>0.6.6</b> Layered boarding gear for every captain and sailor: leather harnesses, reinforced gloves and boots, riveted plates, and distinct cloth, leather, skin and metal finishes.<br><b>0.6.5</b> Refined human proportions, articulated arms, more expressive faces, detailed facial hair and textured clothing for captains and sailors.<br><b>0.6.4</b> More lifelike captain and sailor proportions, faces, tailored uniforms and faction-specific details.<br><b>0.6.3</b> Character models now render correctly in the world and character creator.<br><b>0.6.2</b> Every character has a more naturalistic, sculpted look, with expressive faces, layered clothing and detailed pirate gear.<br><b>0.6.1</b> A tidy HUD on phones: thin meters, an icon toolbar and a smaller thumb cluster, laid out separately for upright and sideways; no pinch-zoom of the page in Safari while playing; the sea no longer shows inside ships' hulls.<br><b>0.6</b> Islands three times wider in a world ten times the size, and ships twice the size that meet hull to hull. Voyages from before 0.6 can’t continue in the new world.</p>
+    <p class="news"><b>NEW IN 0.6.27</b><br>The chart now has 25% more area, with eight large islands and 24 settlements. New port villages have laid-out streets, homes, markets, chapels, lantern posts and piers. Older voyages keep their explored islands, edits and position.<br><b>0.6.26</b><br>Fixed hairline gaps between adjacent block-built structures by keeping shared edges flush; building-piece components no longer bevel into one another.<br><b>0.6.25</b><br>Main-island oaks are now taller, visibly branched and crowned with layered, irregular foliage, with the same richer tree design across every island where oaks grow.<br><b>0.6.24</b><br>Wildlife now has smoother, more natural forms. Barrels are curved, storage props sit off the grid edges, and crafted blocks and building pieces have softened bevels. Captains and sailors have added facial shaping, blinking and subtle idle breathing. Ship collision follows the hull outline, with visible strakes and fasteners.<br><b>0.6.23</b> Ships now use hull-shaped collision outlines for ship-to-ship impacts, and ground contact tests actual waterline hull overlap with terrain cells. Added visible hull strakes and fasteners to bring the boats’ construction to life.<br><b>0.6.22</b> Take Old Mags’ Shipwright’s Wager: build a reputation through the story, contracts, exploration or combat, then earn charters for a Cutter, Brigantine and Frigate. Buy and switch hulls at the shipyard; upgrades work across your fleet, the Cutter unlocks cannon and rudder refits, and the Brigantine opens the copper-sheathed keel. Your boat carries through compatible saves and crew sessions.<br><b>0.6.21</b> Merchantmen and fast packet ships, navy frigates and cutters, and pirate brigs and raiders now sail the seas. Their rigs, speed, turning, durability and broadside strength set them apart; the player's sloop and existing saves are unchanged.<br><b>0.6.20</b> Interaction prompts now match keyboard, DualSense or touch controls; new voyages can opt into a skippable guide for movement, gathering, sailing, combat and saving, with a replay option in the menu. The sea has brighter sun glints and a subtle moving shimmer in shallow water.<br><b>0.6.19</b> Helm camera now chooses a clear view over nearby land and resets cleanly when you take the helm again; the mainsail is shorter so its foot sits higher and blocks less of the view ahead.<br><b>0.6.18</b> Play with a PS5 DualSense or other standard-layout gamepad: twin-stick movement and aiming, mapped buttons and triggers, controller navigation for menus, and an on-screen control guide.<br><b>0.6.17</b> Reshaped the underwater island shelves so the terrain descends gradually from each shore to the shared deep-sea bedrock floor, removing the abrupt drop at island edges.<br><b>0.6.16</b> Doubled the chart area from 1,152 to 1,632 blocks per side, added 23 outer islands for 46 total, and added Outer Reach expedition side quests. Existing 0.6 voyages keep their edits and position.<br><b>0.6.15</b> Rebuilt the stern transom as a continuous set of outward-facing hull panels, closing the see-through gap across the back of the ship.<br><b>0.6.14</b> Widened and lengthened the hold floor, added plank and fastener detail, fixed the bilge collision, and added quick links to customization, quests and an expandable sea chart.<br><b>0.6.13</b> Removed the camera-following seabed plane that showed up as a green moving surface at bedrock.<br><b>0.6.12</b> About four times more underground to mine, ending in an unbreakable bedrock floor. Older 0.6 voyages carry over their edits and player position.<br><b>0.6.11</b> Covered trouser seams, detailed cutlass and firearm models with corrected hand grips, and third-person camera collision against ship structures.<br><b>0.6.10</b> Facial hair now shades directly onto the face, with softer cheek-to-beard blending and fine stubble.<br><b>0.6.9</b> Fine strand-based hair and beard, a cleaner hairline, and visible iris and pupil details.<br><b>0.6.8</b> Rigged human models for the captain and sailors, outfitted as pirate, navy, merchant and hollow crews with age-of-sail gear.<br><b>0.6.7</b> Reworked captain and sailor models with smooth rounded forms, more natural facial detail, refined materials, and layered age-of-sail protection.<br><b>0.6.6</b> Layered boarding gear for every captain and sailor: leather harnesses, reinforced gloves and boots, riveted plates, and distinct cloth, leather, skin and metal finishes.<br><b>0.6.5</b> Refined human proportions, articulated arms, more expressive faces, detailed facial hair and textured clothing for captains and sailors.<br><b>0.6.4</b> More lifelike captain and sailor proportions, faces, tailored uniforms and faction-specific details.<br><b>0.6.3</b> Character models now render correctly in the world and character creator.<br><b>0.6.2</b> Every character has a more naturalistic, sculpted look, with expressive faces, layered clothing and detailed pirate gear.<br><b>0.6.1</b> A tidy HUD on phones: thin meters, an icon toolbar and a smaller thumb cluster, laid out separately for upright and sideways; no pinch-zoom of the page in Safari while playing; the sea no longer shows inside ships' hulls.<br><b>0.6</b> Islands three times wider in a world ten times the size, and ships twice the size that meet hull to hull. Voyages from before 0.6 can’t continue in the new world.</p>
     <p class="credit">A Claude-built prototype.</p>
   </div>
 </section>
@@ -467,13 +487,14 @@ textarea.code { width: 100%; height: 90px; font-family: var(--font-ui); font-siz
 import * as THREE25 from "three";
 
 // src/config.js
-var VERSION = "0.6.19";
+var VERSION = "0.6.27";
 var WS = 3;
 var WORLD_Y_SHIFT = 48;
 var LEGACY_W = 384 * WS;
 var LEGACY_D = 384 * WS;
-var W = 544 * WS;
-var D = 544 * WS;
+var PREVIOUS_MAP_W = 544 * WS;
+var W = 608 * WS;
+var D = 608 * WS;
 var H = 40 + WORLD_Y_SHIFT;
 var OW = 256 * WS;
 var SEA = 12 + WORLD_Y_SHIFT;
@@ -773,7 +794,7 @@ var AO_OFF = FACES.map((F) => F.corners.map((cr) => {
 }));
 
 // src/world.js
-import * as THREE from "three";
+import * as THREE2 from "three";
 
 // src/noise.js
 function mulberry32(a) {
@@ -1173,6 +1194,257 @@ function columnRay(C2, x0, z0, cx2, cz2, ox, oy, oz, dx, dy, dz, t0, t1, out) {
   return best;
 }
 
+// src/geo.js
+import * as THREE from "three";
+var _c = new THREE.Color();
+var TRI = [0, 1, 2, 2, 1, 3];
+var GRID = [0, 1 / 3, 2 / 3, 1];
+function appendRoundedBox(A, x0, y0, z0, x1, y1, z1, layers, shade2 = 1, radius = 0.06, cornerFactors = null, faceUVs = null, adjacent = null) {
+  const lo = [x0, y0, z0], hi = [x1, y1, z1];
+  const r = Math.min(radius, 0.45 * (x1 - x0), 0.45 * (y1 - y0), 0.45 * (z1 - z0));
+  const P = [0, 0, 0], Q = [0, 0, 0];
+  for (let f = 0; f < 6; f++) {
+    if (layers[f] == null) continue;
+    const F = FACES[f], v = A.n;
+    const c0 = F.corners[0], c1 = F.corners[1], c2 = F.corners[2];
+    const vertex = (s, t) => {
+      for (let axis = 0; axis < 3; axis++) {
+        const u = c0[axis] + (c1[axis] - c0[axis]) * s + (c2[axis] - c0[axis]) * t;
+        const a = Math.round(u * 3) / 3;
+        P[axis] = a === 0 ? lo[axis] : a === 1 ? hi[axis] : a < 0.5 ? lo[axis] + r : hi[axis] - r;
+        const edge = a === 0 ? axis * 2 : a === 1 ? axis * 2 + 1 : -1;
+        Q[axis] = adjacent && edge >= 0 && adjacent[edge] ? P[axis] : Math.min(hi[axis] - r, Math.max(lo[axis] + r, P[axis]));
+      }
+      let nx = P[0] - Q[0], ny = P[1] - Q[1], nz = P[2] - Q[2];
+      const length = Math.hypot(nx, ny, nz);
+      if (length > 1e-7) {
+        nx /= length;
+        ny /= length;
+        nz /= length;
+        P[0] = Q[0] + nx * r;
+        P[1] = Q[1] + ny * r;
+        P[2] = Q[2] + nz * r;
+      } else {
+        nx = F.dir[0];
+        ny = F.dir[1];
+        nz = F.dir[2];
+      }
+      A.pos.push(P[0], P[1], P[2]);
+      A.nor.push(nx, ny, nz);
+      A.lay.push(layers[f]);
+      let ao = 1;
+      const factors = cornerFactors && cornerFactors[f];
+      if (factors) ao = factors[0] * (1 - s) * (1 - t) + factors[1] * s * (1 - t) + factors[2] * (1 - s) * t + factors[3] * s * t;
+      const k = shade2 * ao * (ny < -0.1 ? 0.7 : 1);
+      A.col.push(k, k, k);
+      if (faceUVs && faceUVs[f]) {
+        const uv = faceUVs[f];
+        A.uv.push(
+          uv[0][0] * (1 - s) * (1 - t) + uv[1][0] * s * (1 - t) + uv[2][0] * (1 - s) * t + uv[3][0] * s * t,
+          uv[0][1] * (1 - s) * (1 - t) + uv[1][1] * s * (1 - t) + uv[2][1] * (1 - s) * t + uv[3][1] * s * t
+        );
+      } else if (F.axis === 0) A.uv.push(P[2], P[1]);
+      else if (F.axis === 1) A.uv.push(P[0], P[2]);
+      else A.uv.push(P[0], P[1]);
+    };
+    let local = 0;
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
+      const s0 = GRID[i], s1 = GRID[i + 1], t0 = GRID[j], t1 = GRID[j + 1];
+      vertex(s0, t0);
+      vertex(s1, t0);
+      vertex(s0, t1);
+      vertex(s0, t1);
+      vertex(s1, t0);
+      vertex(s1, t1);
+      A.ind.push(v + local, v + local + 1, v + local + 2, v + local + 3, v + local + 4, v + local + 5);
+      local += 6;
+    }
+    A.n += 54;
+  }
+}
+var GeoBuilder = class {
+  constructor(o = {}) {
+    this.p = [];
+    this.n = [];
+    this.c = [];
+    this.uv = [];
+    this.l = [];
+    this.round = o.round || 0;
+  }
+  box(x0, y0, z0, x1, y1, z1, color, layer = T.white, uvScale = 2) {
+    const r = Math.min(this.round, 0.45 * Math.min(x1 - x0, y1 - y0, z1 - z0));
+    if (r > 4e-3) return this.rbox(x0, y0, z0, x1, y1, z1, color, layer, uvScale, r);
+    _c.set(color);
+    for (let f = 0; f < 6; f++) {
+      const F = FACES[f], d = F.dir;
+      for (const i of TRI) {
+        const cr = F.corners[i];
+        const px = cr[0] ? x1 : x0, py = cr[1] ? y1 : y0, pz = cr[2] ? z1 : z0;
+        this.p.push(px, py, pz);
+        this.n.push(d[0], d[1], d[2]);
+        this.c.push(_c.r, _c.g, _c.b);
+        if (f < 2) this.uv.push(pz * uvScale, py * uvScale);
+        else if (f < 4) this.uv.push(px * uvScale, pz * uvScale);
+        else this.uv.push(px * uvScale, py * uvScale);
+        this.l.push(layer);
+      }
+    }
+    return this;
+  }
+  rbox(x0, y0, z0, x1, y1, z1, color, layer, uvScale, r) {
+    _c.set(color);
+    const lo = [x0, y0, z0], hi = [x1, y1, z1];
+    const map = (a, u) => u === 0 ? lo[a] : u === 1 ? hi[a] : u < 0.5 ? lo[a] + r : hi[a] - r;
+    const P = [0, 0, 0], Q = [0, 0, 0];
+    const vert = (F, f, s, t) => {
+      const c0 = F.corners[0], c1 = F.corners[1], c2 = F.corners[2];
+      for (let a = 0; a < 3; a++) {
+        const u = c0[a] + (c1[a] - c0[a]) * s + (c2[a] - c0[a]) * t;
+        P[a] = map(a, Math.round(u * 3) / 3);
+        Q[a] = Math.min(hi[a] - r, Math.max(lo[a] + r, P[a]));
+      }
+      let dx = P[0] - Q[0], dy = P[1] - Q[1], dz = P[2] - Q[2];
+      const l = Math.hypot(dx, dy, dz);
+      if (l > 1e-7) {
+        dx /= l;
+        dy /= l;
+        dz /= l;
+        P[0] = Q[0] + dx * r;
+        P[1] = Q[1] + dy * r;
+        P[2] = Q[2] + dz * r;
+      } else {
+        dx = F.dir[0];
+        dy = F.dir[1];
+        dz = F.dir[2];
+      }
+      this.p.push(P[0], P[1], P[2]);
+      this.n.push(dx, dy, dz);
+      this.c.push(_c.r, _c.g, _c.b);
+      if (f < 2) this.uv.push(P[2] * uvScale, P[1] * uvScale);
+      else if (f < 4) this.uv.push(P[0] * uvScale, P[2] * uvScale);
+      else this.uv.push(P[0] * uvScale, P[1] * uvScale);
+      this.l.push(layer);
+    };
+    for (let f = 0; f < 6; f++) {
+      const F = FACES[f];
+      for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
+        const s0 = GRID[i], s1 = GRID[i + 1], t0 = GRID[j], t1 = GRID[j + 1];
+        vert(F, f, s0, t0);
+        vert(F, f, s1, t0);
+        vert(F, f, s0, t1);
+        vert(F, f, s0, t1);
+        vert(F, f, s1, t0);
+        vert(F, f, s1, t1);
+      }
+    }
+    return this;
+  }
+  // one triangle with its own normals and texture coordinates
+  tri(a, na, ua, b, nb, ub, c, nc, uc, color, layer = T.white) {
+    _c.set(color);
+    for (const [p, n, u] of [[a, na, ua], [b, nb, ub], [c, nc, uc]]) {
+      this.p.push(p[0], p[1], p[2]);
+      this.n.push(n[0], n[1], n[2]);
+      this.c.push(_c.r, _c.g, _c.b);
+      this.uv.push(u[0], u[1]);
+      this.l.push(layer);
+    }
+    return this;
+  }
+  // A quad a b / c d (a and d opposite corners), wound so that it faces n whatever order the corners came in.
+  quad(a, b, c, d, n, color, layer = T.white, ua = [0, 0], ub = [1, 0], uc = [0, 1], ud = [1, 1]) {
+    const e1x = b[0] - a[0], e1y = b[1] - a[1], e1z = b[2] - a[2], e2x = c[0] - a[0], e2y = c[1] - a[1], e2z = c[2] - a[2];
+    const gx = e1y * e2z - e1z * e2y, gy = e1z * e2x - e1x * e2z, gz = e1x * e2y - e1y * e2x;
+    if (gx * n[0] + gy * n[1] + gz * n[2] >= 0) return this.tri(a, n, ua, b, n, ub, c, n, uc, color, layer).tri(c, n, uc, b, n, ub, d, n, ud, color, layer);
+    return this.tri(a, n, ua, c, n, uc, b, n, ub, color, layer).tri(c, n, uc, d, n, ud, b, n, ub, color, layer);
+  }
+  // a triangle wound to face the way its normals point
+  otri(p, np, up, q, nq, uq, r, nr, ur, color, layer) {
+    const ex = q[0] - p[0], ey = q[1] - p[1], ez = q[2] - p[2], fx = r[0] - p[0], fy = r[1] - p[1], fz = r[2] - p[2];
+    const g = (ey * fz - ez * fy) * (np[0] + nq[0] + nr[0]) + (ez * fx - ex * fz) * (np[1] + nq[1] + nr[1]) + (ex * fy - ey * fx) * (np[2] + nq[2] + nr[2]);
+    return g >= 0 ? this.tri(p, np, up, q, nq, uq, r, nr, ur, color, layer) : this.tri(p, np, up, r, nr, ur, q, nq, uq, color, layer);
+  }
+  // one flat-shaded triangle facing n
+  face(p, q, r, n, color, layer = T.white) {
+    const ex = q[0] - p[0], ey = q[1] - p[1], ez = q[2] - p[2], fx = r[0] - p[0], fy = r[1] - p[1], fz = r[2] - p[2];
+    const g = (ey * fz - ez * fy) * n[0] + (ez * fx - ex * fz) * n[1] + (ex * fy - ey * fx) * n[2];
+    const u = (v) => [v[0] + v[2], v[1]];
+    return g >= 0 ? this.tri(p, n, u(p), q, n, u(q), r, n, u(r), color, layer) : this.tri(p, n, u(p), r, n, u(r), q, n, u(q), color, layer);
+  }
+  ellipsoid(cx2, cy2, cz2, rx, ry, rz, color, layer = T.white, segments = 10, rings2 = 6) {
+    const point = (theta, phi) => [cx2 + rx * Math.sin(theta) * Math.cos(phi), cy2 + ry * Math.cos(theta), cz2 + rz * Math.sin(theta) * Math.sin(phi)];
+    const normal = (p) => {
+      const n = [(p[0] - cx2) / (rx * rx), (p[1] - cy2) / (ry * ry), (p[2] - cz2) / (rz * rz)];
+      const length = Math.hypot(n[0], n[1], n[2]);
+      return [n[0] / length, n[1] / length, n[2] / length];
+    };
+    for (let j = 0; j < rings2; j++) for (let i = 0; i < segments; i++) {
+      const u0 = i / segments, u1 = (i + 1) / segments;
+      const v0 = j / rings2, v1 = (j + 1) / rings2;
+      const p00 = point(v0 * Math.PI, u0 * Math.PI * 2), p10 = point(v0 * Math.PI, u1 * Math.PI * 2);
+      const p01 = point(v1 * Math.PI, u0 * Math.PI * 2), p11 = point(v1 * Math.PI, u1 * Math.PI * 2);
+      this.otri(p00, normal(p00), [u0, v0], p01, normal(p01), [u0, v1], p10, normal(p10), [u1, v0], color, layer);
+      this.otri(p10, normal(p10), [u1, v0], p01, normal(p01), [u0, v1], p11, normal(p11), [u1, v1], color, layer);
+    }
+    return this;
+  }
+  // a tapered round post from (x0, y0, z0) to (x1, y1, z1)
+  cyl(x0, y0, z0, x1, y1, z1, r0, r12, color, layer = T.white, segs = 10, caps = true) {
+    const ax = new THREE.Vector3(x1 - x0, y1 - y0, z1 - z0), len = ax.length();
+    ax.divideScalar(len);
+    const u = Math.abs(ax.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const e1 = new THREE.Vector3().crossVectors(ax, u).normalize(), e2 = new THREE.Vector3().crossVectors(ax, e1);
+    const ring = (k, r, y) => {
+      const a = k / segs * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+      return [[(y ? x1 : x0) + (e1.x * c + e2.x * s) * r, (y ? y1 : y0) + (e1.y * c + e2.y * s) * r, (y ? z1 : z0) + (e1.z * c + e2.z * s) * r], [e1.x * c + e2.x * s, e1.y * c + e2.y * s, e1.z * c + e2.z * s]];
+    };
+    for (let k = 0; k < segs; k++) {
+      const [a0, n0] = ring(k, r0, 0), [a1, n1] = ring(k + 1, r0, 0), [b0] = ring(k, r12, 1), [b1] = ring(k + 1, r12, 1);
+      const u0 = [k / segs * 2, 0], u1 = [(k + 1) / segs * 2, 0], v0 = [k / segs * 2, len], v1 = [(k + 1) / segs * 2, len];
+      this.otri(a0, n0, u0, b1, n1, v1, b0, n0, v0, color, layer).otri(a0, n0, u0, a1, n1, u1, b1, n1, v1, color, layer);
+      if (caps) {
+        const na = [-ax.x, -ax.y, -ax.z], nb = [ax.x, ax.y, ax.z];
+        this.otri([x0, y0, z0], na, [0, 0], a0, na, [0, 0], a1, na, [0, 0], color, layer);
+        this.otri([x1, y1, z1], nb, [0, 0], b1, nb, [0, 0], b0, nb, [0, 0], color, layer);
+      }
+    }
+    return this;
+  }
+  get empty() {
+    return this.p.length === 0;
+  }
+  build() {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(this.p, 3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute(this.n, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(this.c, 3));
+    g.setAttribute("tuv", new THREE.Float32BufferAttribute(this.uv, 2));
+    g.setAttribute("layer", new THREE.Float32BufferAttribute(this.l, 1));
+    g.computeBoundingSphere();
+    return g;
+  }
+};
+var glowTex = null;
+function glowTexture() {
+  if (glowTex) return glowTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const x = c.getContext("2d");
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.25, "rgba(255,255,255,0.55)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  x.fillStyle = g;
+  x.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(c);
+  return glowTex;
+}
+function glowSprite(color, size2, opacity = 1) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity }));
+  s.scale.set(size2, size2, 1);
+  return s;
+}
+
 // src/pieces.js
 var PIECE_LO = 128;
 var PIECE_HI = 209;
@@ -1268,22 +1540,7 @@ var TILES = [
   { panel: T.brick, frame: T.whitebrick, floor: T.slate, roof: T.slate, post: T.brick }
 ];
 function boxA(A, x0, y0, z0, x1, y1, z1, tile, shade2) {
-  for (let f = 0; f < 6; f++) {
-    const F = FACES[f], n = F.dir, v = A.n;
-    for (const cr of F.corners) {
-      const px = cr[0] ? x1 : x0, py = cr[1] ? y1 : y0, pz = cr[2] ? z1 : z0;
-      A.pos.push(px, py, pz);
-      A.nor.push(n[0], n[1], n[2]);
-      if (F.axis === 0) A.uv.push(pz, py);
-      else if (F.axis === 1) A.uv.push(px, pz);
-      else A.uv.push(px, py);
-      A.lay.push(tile);
-      const k = shade2 * (n[1] < 0 ? 0.7 : 1);
-      A.col.push(k, k, k);
-    }
-    A.ind.push(v, v + 1, v + 2, v + 2, v + 1, v + 3);
-    A.n += 4;
-  }
+  appendRoundedBox(A, x0, y0, z0, x1, y1, z1, [tile, tile, tile, tile, tile, tile], shade2, 0);
 }
 function slopeA(A, x, y, z, rot, tile, shade2, th = 0.12) {
   const pt = (lx, ly, lz) => {
@@ -1411,24 +1668,24 @@ for (const id of [B.LEAVES, B.JLEAVES]) LEAFY[id] = 1;
 for (const id of [B.LOG, B.PALM, B.JLOG]) WOODY[id] = 1;
 for (const id of [B.PLANK, B.CHEST, B.BRICK, B.CLOTH, B.VAULT, B.LAMP, B.MOSSBRICK, B.WHITEBRICK, B.WRECKWOOD, B.BARREL, B.CRATE, B.KEG]) CRISP[id] = 1;
 for (let i = 0; i < 256; i++) HARD[i] = CRISP[i] || WOODY[i] || PIECE[i];
-var _c = new THREE.Color();
+var _c2 = new THREE2.Color();
 function toGeometry(Q) {
   if (!Q.n) return null;
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(Q.pos, 3));
-  g.setAttribute("normal", new THREE.Float32BufferAttribute(Q.nor, 3));
-  g.setAttribute("color", new THREE.Float32BufferAttribute(Q.col, 3));
+  const g = new THREE2.BufferGeometry();
+  g.setAttribute("position", new THREE2.Float32BufferAttribute(Q.pos, 3));
+  g.setAttribute("normal", new THREE2.Float32BufferAttribute(Q.nor, 3));
+  g.setAttribute("color", new THREE2.Float32BufferAttribute(Q.col, 3));
   if (Q.lay) {
-    g.setAttribute("tuv", new THREE.Float32BufferAttribute(Q.uv, 2));
-    g.setAttribute("layer", new THREE.Float32BufferAttribute(Q.lay, 1));
-  } else g.setAttribute("uv", new THREE.Float32BufferAttribute(Q.uv, 2));
-  if (Q.sway) g.setAttribute("sway", new THREE.Float32BufferAttribute(Q.sway, 1));
+    g.setAttribute("tuv", new THREE2.Float32BufferAttribute(Q.uv, 2));
+    g.setAttribute("layer", new THREE2.Float32BufferAttribute(Q.lay, 1));
+  } else g.setAttribute("uv", new THREE2.Float32BufferAttribute(Q.uv, 2));
+  if (Q.sway) g.setAttribute("sway", new THREE2.Float32BufferAttribute(Q.sway, 1));
   g.setIndex(Q.ind);
   return g;
 }
 var lin = (hex) => {
-  _c.setHex(hex);
-  return [_c.r, _c.g, _c.b];
+  _c2.setHex(hex);
+  return [_c2.r, _c2.g, _c2.b];
 };
 var TM = [];
 var tm = (id, top, side, det, glow = 0) => {
@@ -1461,7 +1718,7 @@ var World = class {
     this.islands = [];
     this.reserved = [];
     this.sites = {};
-    this.group = new THREE.Group();
+    this.group = new THREE2.Group();
     this.meshes = /* @__PURE__ */ new Map();
     this.dirty = /* @__PURE__ */ new Set();
     this.depthDirty = /* @__PURE__ */ new Set();
@@ -1573,7 +1830,7 @@ var World = class {
     this.dirty.clear();
     this.depthDirty.clear();
     this.lamps.clear();
-    this.sites = { wrecks: [], loot: [] };
+    this.sites = { wrecks: [], loot: [], villages: [] };
     this.bw = OW;
     this.bd = OW;
     const rnd2 = mulberry32(this.seed);
@@ -1582,12 +1839,12 @@ var World = class {
     this.nH = nH;
     this.nD = nD;
     const hills = (x, z, t) => this.hills(x, z, t);
-    const isl = [{ name: "Brine Haven", x: 114 * WS, z: 128 * WS, r: 30 * WS, peak: 6 * PS, type: "outpost" }];
+    const isl = [{ name: "Brine Haven", x: 114 * WS, z: 128 * WS, r: 38 * WS, placementR: 30 * WS, peak: 8 * PS, type: "outpost" }];
     for (let tries = 0; isl.length < 9 && tries < 8e3; tries++) {
       const type = ISLAND_TYPES[isl.length - 1];
       const r = WS * (type === "rock" ? 15 + rnd2() * 7 : type === "palm" ? 17 + rnd2() * 8 : 21 + rnd2() * 9);
       const x = 26 * WS + rnd2() * (OW - 52 * WS), z = 26 * WS + rnd2() * (OW - 52 * WS);
-      if (isl.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 10 * WS)) continue;
+      if (isl.some((o) => Math.hypot(o.x - x, o.z - z) < (o.placementR ?? o.r) + r + 10 * WS)) continue;
       const peak = PS * (type === "palm" ? 3 + rnd2() * 2.5 : type === "forest" ? 8 + rnd2() * 5 : type === "rock" ? 13 + rnd2() * 6 : 8 + rnd2() * 3);
       isl.push({ name: ISLAND_NAMES[isl.length - 1], x, z, r, peak, type });
     }
@@ -1639,6 +1896,7 @@ var World = class {
     }
     const idx2 = (name) => isl.findIndex((o) => o.name === name);
     this.buildOutpost();
+    this.buildVillage(isl[0], "major");
     const lc = idx2("Lantern Cay");
     if (lc >= 0) this.buildLighthouse(lc);
     const sb = idx2("Saltbone Isle");
@@ -1653,6 +1911,7 @@ var World = class {
     this.expand();
     this.moreIslands();
     this.frontierIslands();
+    this.extendedIslands();
     this.dirty.clear();
     this.depthDirty.clear();
     this.landMask = new Uint8Array(W * D);
@@ -1719,6 +1978,155 @@ var World = class {
     this.dock = { x: sx + 17, z: zc + 7, heading: -Math.PI / 2 };
     this.sites.dock = this.dock;
     this.reserved.push({ x0: stx - 7, x1: sx + 42, z0: stz - 5, z1: zc + 15 });
+  }
+  buildVillage(o, tier) {
+    const island = this.islands.indexOf(o), major = tier === "major", village = tier === "village";
+    if (island < 0) return null;
+    const radius = Math.min(major ? 42 : village ? 27 : 19, Math.floor(o.r * 0.55));
+    const angle = o.name === "Brine Haven" ? Math.PI : hash3(island, Math.round(o.x), Math.round(o.z)) * Math.PI * 2;
+    let cx2 = Math.floor(o.x + Math.cos(angle) * o.r * 0.18), cz2 = Math.floor(o.z + Math.sin(angle) * o.r * 0.18);
+    if (this.islandOf[cx2 + cz2 * W] !== island || this.surf[cx2 + cz2 * W] <= SEA + 1) {
+      let nearest = null, nearestD = Infinity;
+      for (let x = Math.floor(o.x - o.r * 0.4); x <= o.x + o.r * 0.4; x++) for (let z = Math.floor(o.z - o.r * 0.4); z <= o.z + o.r * 0.4; z++) {
+        const d = Math.hypot(x - cx2, z - cz2), i = x + z * W;
+        if (d < nearestD && this.islandOf[i] === island && this.surf[i] > SEA + 1) {
+          nearest = [x, z];
+          nearestD = d;
+        }
+      }
+      if (!nearest) return null;
+      [cx2, cz2] = nearest;
+    }
+    const center = cx2 + cz2 * W, g = Math.max(SEA + 2, this.surf[center]);
+    this.flatten(cx2, cz2, radius, g, B.GRASS);
+    const spacing = Math.max(7, Math.floor(radius / (major ? 3.5 : village ? 2.5 : 2)));
+    const grid = major ? [-2, -1, 0, 1, 2] : [-1, 0, 1];
+    for (let lane = 0; lane <= grid.length; lane++) {
+      const road = Math.round((lane - grid.length / 2) * spacing);
+      for (let k = -radius; k <= radius; k++) {
+        this.raw(cx2 + road, g, cz2 + k, B.STONE);
+        this.raw(cx2 + k, g, cz2 + road, B.STONE);
+      }
+    }
+    for (let dx2 = -4; dx2 <= 4; dx2++) for (let dz2 = -4; dz2 <= 4; dz2++) this.raw(cx2 + dx2, g, cz2 + dz2, B.BRICK);
+    for (const [dx2, dz2] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) this.raw(cx2 + dx2, g + 1, cz2 + dz2, B.BRICK);
+    this.raw(cx2, g + 1, cz2, B.BARREL);
+    const lots = [];
+    for (const x of grid) for (const z of grid) {
+      if (x === 0 && z === 0) continue;
+      if (z === 0 && x > 0) continue;
+      if (!major && !village && Math.abs(x) !== 1) continue;
+      lots.push([x, z]);
+    }
+    for (const [x, z] of lots) {
+      let role = "house";
+      if (major && x === -1 && z === 0) role = "inn";
+      else if (major && x === 0 && z === -1) role = "chapel";
+      else if (x === 1 && z === 1) role = "market";
+      else if (x === 0 && z === 1) role = "warehouse";
+      else if (x === -2 && z === -1) role = "workshop";
+      const hw = role === "chapel" || role === "inn" || role === "warehouse" ? major ? 4 : 3 : major ? 3 : 2;
+      const hd = role === "chapel" || role === "inn" || role === "warehouse" ? major ? 4 : 3 : major ? 3 : 2;
+      this.villageHouse(cx2 + x * spacing, cz2 + z * spacing, g, hw, hd, role);
+    }
+    const stallOffset = Math.max(3, Math.floor(spacing / 3));
+    const stallCorners = [[-stallOffset, -stallOffset], [stallOffset, -stallOffset], [-stallOffset, stallOffset], [stallOffset, stallOffset]];
+    for (let stall = 0; stall < 2; stall++) {
+      const [dx2, dz2] = stallCorners[(island + stall) % stallCorners.length];
+      const alongX = dx2 * dz2 > 0;
+      for (let k = -1; k <= 1; k++) {
+        const x = cx2 + dx2 + (alongX ? k : 0), z = cz2 + dz2 + (alongX ? 0 : k);
+        this.raw(x, g, z, B.PLANK);
+        this.raw(x, g + 4, z, B.CLOTH);
+      }
+      for (const k of [-1, 1]) {
+        const x = cx2 + dx2 + (alongX ? k : 0), z = cz2 + dz2 + (alongX ? 0 : k);
+        for (let y = g + 1; y <= g + 3; y++) this.raw(x, y, z, B.LOG);
+      }
+      this.raw(cx2 + dx2, g + 1, cz2 + dz2, (dx2 + dz2) % 2 ? B.BARREL : B.CRATE);
+    }
+    const lights = major ? [-2, -1, 0, 1, 2] : [-1, 0, 1];
+    for (const k of lights) {
+      for (const [x, z] of [[cx2 + k * spacing, cz2 - radius + 3], [cx2 + k * spacing, cz2 + radius - 3], [cx2 - radius + 3, cz2 + k * spacing], [cx2 + radius - 3, cz2 + k * spacing]]) {
+        this.raw(x, g + 1, z, B.LOG);
+        this.raw(x, g + 2, z, B.LOG);
+        this.raw(x, g + 3, z, B.LAMP);
+      }
+    }
+    const dx = o.name === "Brine Haven" ? -1 : 1, dz = 0;
+    let shore = 0;
+    for (let d = 1; d < o.r * 2; d++) {
+      const x = Math.floor(cx2 + dx * d), z = Math.floor(cz2 + dz * d);
+      if (!this.inside(x, 0, z) || this.islandOf[x + z * W] !== island || this.surf[x + z * W] <= SEA + 1) {
+        shore = d;
+        break;
+      }
+    }
+    if (!shore) shore = Math.floor(o.r * 1.15);
+    for (let d = 0; d < shore - 1; d++) {
+      const x = Math.floor(cx2 + dx * d), z = Math.floor(cz2 + dz * d), y = Math.max(SEA + 1, this.surf[x + z * W]);
+      for (let side = -1; side <= 1; side++) {
+        const px = Math.floor(x - dz * side), pz = Math.floor(z + dx * side);
+        this.raw(px, y, pz, B.STONE);
+      }
+    }
+    const dockX = Math.floor(cx2 + dx * (shore - 1)), dockZ = Math.floor(cz2 + dz * (shore - 1));
+    for (let k = 0; k < 18; k++) for (let side = -1; side <= 1; side++) {
+      const x = Math.floor(dockX + dx * k - dz * side), z = Math.floor(dockZ + dz * k + dx * side);
+      this.raw(x, SEA + 1, z, B.PLANK);
+      if (side && k % 4 === 0) {
+        const bottom = this.topSolid(x, z);
+        for (let y = bottom + 1; y < SEA + 1; y++) this.raw(x, y, z, B.LOG);
+      }
+    }
+    this.raw(dockX + Math.round(dx * 16), SEA + 1, dockZ + Math.round(dz * 16), B.CRATE);
+    this.sites.villages.push({ island, name: o.name, x: cx2 + 0.5, y: g, z: cz2 + 0.5, tier });
+    const endX = Math.floor(dockX + dx * 18), endZ = Math.floor(dockZ + dz * 18);
+    this.reserved.push({ x0: Math.min(cx2 - radius - 2, endX - 2), x1: Math.max(cx2 + radius + 2, endX + 2), z0: Math.min(cz2 - radius - 2, endZ - 2), z1: Math.max(cz2 + radius + 2, endZ + 2) });
+  }
+  villageHouse(cx2, cz2, g, hw, hd, role) {
+    const wallH = role === "chapel" ? 5 : 3;
+    const wall = role === "chapel" || role === "warehouse" ? B.WHITEBRICK : B.PLANK;
+    const roof = role === "chapel" ? B.SLATE : B.WRECKWOOD;
+    for (let dx = -hw; dx <= hw; dx++) for (let dz = -hd; dz <= hd; dz++) {
+      const edge = Math.abs(dx) === hw || Math.abs(dz) === hd;
+      this.raw(cx2 + dx, g, cz2 + dz, edge ? B.BRICK : B.PLANK);
+      for (let y = g + 1; y <= g + wallH; y++) {
+        if (!edge || dz === hd && dx === 0 && y <= g + 2) continue;
+        const window2 = y === g + 2 && (Math.abs(dx) === hw && Math.abs(dz) === 1 || Math.abs(dz) === hd && Math.abs(dx) === 2);
+        if (!window2) this.raw(cx2 + dx, y, cz2 + dz, wall);
+      }
+    }
+    for (const [dx, dz] of [[-hw, -hd], [-hw, hd], [hw, -hd], [hw, hd]]) {
+      for (let y = g + 1; y <= g + wallH; y++) this.raw(cx2 + dx, y, cz2 + dz, B.LOG);
+    }
+    for (let dx = -hw; dx <= hw; dx++) for (let dz = -hd; dz <= hd; dz++) {
+      if (Math.abs(dx) === hw || Math.abs(dz) === hd) this.raw(cx2 + dx, g + wallH, cz2 + dz, B.LOG);
+    }
+    const rise = hd + 1;
+    for (let dz = -rise; dz <= rise; dz++) {
+      const y = g + wallH + rise - Math.abs(dz);
+      for (let dx = -hw - 1; dx <= hw + 1; dx++) {
+        this.raw(cx2 + dx, y - 1, cz2 + dz, roof);
+        this.raw(cx2 + dx, y, cz2 + dz, roof);
+      }
+    }
+    for (let dx = -hw; dx <= hw; dx++) this.raw(cx2 + dx, g + wallH + rise, cz2, B.LOG);
+    for (let dx = -1; dx <= 1; dx++) this.raw(cx2 + dx, g, cz2 + hd + 1, B.PLANK);
+    if (role === "inn" || role === "market") {
+      for (const dx of [-2, 2]) for (let y = g + 1; y <= g + 3; y++) this.raw(cx2 + dx, y, cz2 + hd + 2, B.LOG);
+      for (let dx = -2; dx <= 2; dx++) this.raw(cx2 + dx, g + 3, cz2 + hd + 2, B.CLOTH);
+      this.raw(cx2, g + 4, cz2 + hd + 2, B.LAMP);
+    }
+    if (role === "inn" || role === "warehouse" || role === "workshop") {
+      this.raw(cx2 - hw - 1, g + 1, cz2 + hd - 1, role === "inn" ? B.BARREL : B.CRATE);
+      this.raw(cx2 + hw + 1, g + 1, cz2 + hd - 1, role === "workshop" ? B.KEG : B.BARREL);
+    }
+    if (role === "chapel") {
+      for (let y = g + wallH + rise + 1; y <= g + wallH + rise + 3; y++) this.raw(cx2, y, cz2 - 1, B.WHITEBRICK);
+      this.raw(cx2, g + wallH + rise + 4, cz2 - 1, B.LAMP);
+    }
+    this.raw(cx2, g + 2, cz2, B.LAMP);
   }
   buildLighthouse(i) {
     const o = this.islands[i];
@@ -1878,16 +2286,34 @@ var World = class {
     }
   }
   oak(x, s, z, rnd2) {
-    const h2 = 4 + Math.floor(rnd2() * 2);
+    const h2 = 7 + Math.floor(rnd2() * 3);
+    for (let i = 0; i < 12; i++) rnd2();
     for (let y = s; y < s + h2; y++) this.raw(x, y, z, B.LOG);
     const top = s + h2;
-    for (let dy = -2; dy <= 1; dy++) {
-      const rad = dy <= -1 ? 2 : 1;
-      for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
-        if (Math.abs(dx) === rad && Math.abs(dz) === rad && (dy === 1 || rnd2() < 0.5)) continue;
-        this.rawIfAir(x + dx, top + dy, z + dz, B.LEAVES);
+    const arms = [];
+    for (const [i, [dx, dz]] of [[1, 0], [-1, 0], [0, 1], [0, -1]].entries()) {
+      const branchY = s + h2 - 3 + (hash3(x + i, s, z - i) > 0.5 ? 1 : 0);
+      const len = 2 + Math.floor(hash3(x - i, branchY, z + i) * 2);
+      let bx = x, bz = z;
+      for (let step = 1; step <= len; step++) {
+        bx += dx;
+        bz += dz;
+        this.rawIfAir(bx, branchY, bz, B.LOG);
       }
+      arms.push([bx, branchY, bz]);
     }
+    const crown = (cx2, cy2, cz2, rx, ry, rz) => {
+      for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++) {
+        for (let dx = -Math.ceil(rx); dx <= Math.ceil(rx); dx++) for (let dz = -Math.ceil(rz); dz <= Math.ceil(rz); dz++) {
+          const d = dx * dx / (rx * rx) + dy * dy / (ry * ry) + dz * dz / (rz * rz);
+          const edge = (hash3(cx2 + dx, cy2 + dy, cz2 + dz) - 0.5) * 0.2;
+          if (d > 1 + edge || d > 0.72 && hash3(cx2 + dx * 3, cy2 + dy * 3, cz2 + dz * 3) < 0.06) continue;
+          this.rawIfAir(cx2 + dx, cy2 + dy, cz2 + dz, B.LEAVES);
+        }
+      }
+    };
+    crown(x, top - 1, z, 3.1, 2.6, 3.1);
+    for (const [ax, ay, az] of arms) crown(ax, top - 2, az, 2.1, 1.8, 2.1);
   }
   palm(x, s, z, rnd2) {
     const h2 = 5 + Math.floor(rnd2() * 3);
@@ -2071,7 +2497,7 @@ var World = class {
     const add = (g, mat, kind, cast) => {
       if (!g) return;
       g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, mat);
+      const m = new THREE2.Mesh(g, mat);
       m.matrixAutoUpdate = false;
       m.updateMatrix();
       m.userData.cx = x0 + 8;
@@ -2145,14 +2571,14 @@ var World = class {
       }
       I.push(map[v]);
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
-    g.setAttribute("normal", new THREE.Float32BufferAttribute(N2, 3));
-    g.setAttribute("color", new THREE.Float32BufferAttribute(C1, 3));
-    g.setAttribute("color2", new THREE.Float32BufferAttribute(C2, 3));
-    g.setAttribute("detail", new THREE.Float32BufferAttribute(DT, 4));
-    g.setAttribute("glow", new THREE.Float32BufferAttribute(GL, 1));
-    g.setIndex(m > 65535 ? new THREE.Uint32BufferAttribute(I, 1) : new THREE.Uint16BufferAttribute(I, 1));
+    const g = new THREE2.BufferGeometry();
+    g.setAttribute("position", new THREE2.Float32BufferAttribute(P, 3));
+    g.setAttribute("normal", new THREE2.Float32BufferAttribute(N2, 3));
+    g.setAttribute("color", new THREE2.Float32BufferAttribute(C1, 3));
+    g.setAttribute("color2", new THREE2.Float32BufferAttribute(C2, 3));
+    g.setAttribute("detail", new THREE2.Float32BufferAttribute(DT, 4));
+    g.setAttribute("glow", new THREE2.Float32BufferAttribute(GL, 1));
+    g.setIndex(m > 65535 ? new THREE2.Uint32BufferAttribute(I, 1) : new THREE2.Uint16BufferAttribute(I, 1));
     return g;
   }
   // a tapered round segment from (x0,y0,z0) to (x1,y1,z1), bark wrapped around it
@@ -2339,31 +2765,85 @@ var World = class {
       F.n += (segs + 1) * 2;
     }
   }
-  // a crafted block: six faces (the hidden ones skipped), each with its own corner shading
-  emitBlock(A, x, y, z, id, def, h2) {
-    const aos = this._aos || (this._aos = [0, 0, 0, 0]);
-    const tint = 0.93 + 0.12 * h2;
-    for (let f = 0; f < 6; f++) {
-      const Fc = FACES[f], d = Fc.dir;
-      if (CRISP[this.get(x + d[0], y + d[1], z + d[2])]) continue;
-      let tile = d[1] === 1 ? def.tex[0] : d[1] === -1 ? def.tex[2] : def.tex[1];
-      if (def.front && d[1] === 0) tile = def.front;
-      const offs = AO_OFF[f], uvs = FACE_UV[f];
-      for (let c = 0; c < 4; c++) aos[c] = this.ao(x, y, z, offs[c]);
-      for (let c = 0; c < 4; c++) {
-        const cr = Fc.corners[c];
-        A.pos.push(x + cr[0], y + cr[1], z + cr[2]);
-        A.nor.push(d[0], d[1], d[2]);
-        A.uv.push(uvs[c][0], uvs[c][1]);
-        A.lay.push(tile);
-        const k = AO_CURVE[aos[c]] * tint;
+  emitCoopered(A, x, y, z, def, h2, kind) {
+    const profile2 = kind === B.KEG ? [[0.08, 0.3], [0.19, 0.37], [0.5, 0.39], [0.81, 0.37], [0.92, 0.3]] : [[0.04, 0.32], [0.16, 0.4], [0.5, 0.43], [0.84, 0.4], [0.96, 0.32]];
+    const segments = 18, tint = 0.93 + 0.12 * h2, sideTile = def.tex[1];
+    const normalAt = (row, angle) => {
+      const prev = profile2[Math.max(0, row - 1)], next = profile2[Math.min(profile2.length - 1, row + 1)];
+      const slope = (next[1] - prev[1]) / Math.max(1e-3, next[0] - prev[0]);
+      const n = [Math.cos(angle), -slope, Math.sin(angle)], length = Math.hypot(n[0], n[1], n[2]);
+      return n.map((v) => v / length);
+    };
+    for (let row = 0; row < profile2.length - 1; row++) for (let i = 0; i < segments; i++) {
+      const a0 = i / segments * Math.PI * 2, a1 = (i + 1) / segments * Math.PI * 2;
+      const r0 = profile2[row][1], r12 = profile2[row + 1][1], y0 = profile2[row][0], y1 = profile2[row + 1][0], v = A.n;
+      const push = (radius, yy, angle, uvY, rowIndex) => {
+        const nx = Math.cos(angle), nz = Math.sin(angle), n = normalAt(rowIndex, angle);
+        A.pos.push(x + 0.5 + nx * radius, y + yy, z + 0.5 + nz * radius);
+        A.nor.push(n[0], n[1], n[2]);
+        A.uv.push(i / segments + (angle === a1 ? 1 / segments : 0), uvY);
+        A.lay.push(sideTile);
+        const k = tint * (0.92 + 0.08 * Math.max(0, n[1]));
         A.col.push(k, k, k);
-      }
-      const v = A.n;
-      if (aos[1] + aos[2] > aos[0] + aos[3]) A.ind.push(v, v + 1, v + 3, v, v + 3, v + 2);
-      else A.ind.push(v, v + 1, v + 2, v + 2, v + 1, v + 3);
+      };
+      push(r0, y0, a0, y0, row);
+      push(r0, y0, a1, y0, row);
+      push(r12, y1, a0, y1, row + 1);
+      push(r12, y1, a1, y1, row + 1);
+      A.ind.push(v, v + 2, v + 1, v + 1, v + 2, v + 3);
       A.n += 4;
     }
+    for (const top of [false, true]) {
+      const row = top ? profile2.length - 1 : 0, yy = profile2[row][0], radius = profile2[row][1], v = A.n, normalY = top ? 1 : -1;
+      A.pos.push(x + 0.5, y + yy, z + 0.5);
+      A.nor.push(0, normalY, 0);
+      A.uv.push(0.5, 0.5);
+      A.lay.push(top ? def.tex[0] : def.tex[2]);
+      const k = tint * (top ? 1 : 0.72);
+      A.col.push(k, k, k);
+      for (let i = 0; i < segments; i++) {
+        const angle = i / segments * Math.PI * 2, nx = Math.cos(angle), nz = Math.sin(angle);
+        A.pos.push(x + 0.5 + nx * radius, y + yy, z + 0.5 + nz * radius);
+        A.nor.push(0, normalY, 0);
+        A.uv.push(0.5 + nx * 0.5, 0.5 + nz * 0.5);
+        A.lay.push(top ? def.tex[0] : def.tex[2]);
+        A.col.push(k, k, k);
+      }
+      for (let i = 0; i < segments; i++) {
+        const a = v + 1 + i, b = v + 1 + (i + 1) % segments;
+        if (top) A.ind.push(v, b, a);
+        else A.ind.push(v, a, b);
+      }
+      A.n += segments + 1;
+    }
+  }
+  // A crafted block: beveled faces, with smaller isolated forms for storage props.
+  emitBlock(A, x, y, z, id, def, h2) {
+    if (id === B.BARREL || id === B.KEG) {
+      this.emitCoopered(A, x, y, z, def, h2, id);
+      return;
+    }
+    const tint = 0.93 + 0.12 * h2;
+    const layers = new Array(6).fill(null), factors = new Array(6);
+    const inset = id === B.CHEST || id === B.CRATE ? 0.07 : 0;
+    const bounds = [x + inset, y + inset, z + inset, x + 1 - inset, y + 1 - inset, z + 1 - inset];
+    for (let f = 0; f < 6; f++) {
+      const Fc = FACES[f], d = Fc.dir;
+      if (!inset && CRISP[this.get(x + d[0], y + d[1], z + d[2])]) continue;
+      let tile = d[1] === 1 ? def.tex[0] : d[1] === -1 ? def.tex[2] : def.tex[1];
+      if (def.front && d[1] === 0) tile = def.front;
+      layers[f] = tile;
+      factors[f] = AO_OFF[f].map((offset) => AO_CURVE[this.ao(x, y, z, offset)]);
+    }
+    const adjacent = inset ? null : [
+      OPAQUE[this.get(x - 1, y, z)],
+      OPAQUE[this.get(x + 1, y, z)],
+      OPAQUE[this.get(x, y - 1, z)],
+      OPAQUE[this.get(x, y + 1, z)],
+      OPAQUE[this.get(x, y, z - 1)],
+      OPAQUE[this.get(x, y, z + 1)]
+    ];
+    appendRoundedBox(A, ...bounds, layers, tint, inset ? 0.12 : 0.14, factors, FACE_UV, adjacent);
   }
   hard(x, y, z) {
     return HARD[this.get(x, y, z)] === 1;
@@ -2474,11 +2954,11 @@ var World = class {
     }
     const vol = Object.create(this);
     vol.data = S2;
-    const group = new THREE.Group();
+    const group = new THREE2.Group();
     const add = (g, mat) => {
       if (!g) return;
       g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, mat);
+      const m = new THREE2.Mesh(g, mat);
       m.castShadow = this.shadows;
       m.receiveShadow = this.shadows;
       group.add(m);
@@ -2828,7 +3308,7 @@ var World = class {
         const r = WS * (R3[type][0] + rnd2() * R3[type][1]);
         const x = 22 * WS + r + rnd2() * (LEGACY_W - 44 * WS - 2 * r), z = 22 * WS + r + rnd2() * (LEGACY_D - 44 * WS - 2 * r);
         if (tries < 6e3 && x < OW + 4 && z < OW + 4) continue;
-        if (this.islands.some((o2) => Math.hypot(o2.x - x, o2.z - z) < o2.r + r + 15 * WS)) continue;
+        if (this.islands.some((o2) => Math.hypot(o2.x - x, o2.z - z) < (o2.placementR ?? o2.r) + r + 15 * WS)) continue;
         const o = { name, x, z, r, peak: PS * (PEAK[type][0] + rnd2() * PEAK[type][1]), type };
         this.islands.push(o);
         added.push(o);
@@ -2907,7 +3387,7 @@ var World = class {
       const s = Math.min(H - 8, Math.floor(sh.h));
       const ci = x + z * W;
       if (s <= this.surf[ci]) continue;
-      if (this.islandOf[ci] >= 0 && this.islandOf[ci] !== i && (o.late || this.surf[ci] > SEA - 2)) continue;
+      if (this.islandOf[ci] >= 0 && this.islandOf[ci] !== i && (this.surf[ci] > SEA - 2 || o.late && !o.extended)) continue;
       const dn = this.nD(x * 0.15, z * 0.15);
       let top = B.SAND, sub = B.SAND, deep = B.STONE;
       if (o.type === "volcano") {
@@ -3254,7 +3734,7 @@ var World = class {
     ];
     const added = [];
     const clear = (x, z, r) => {
-      if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < (o.r + r) * 1.2 + 18 * WS)) return false;
+      if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < ((o.placementR ?? o.r) + r) * 1.2 + 18 * WS)) return false;
       for (const w of this.sites.wrecks) if (Math.hypot(w.x - x, w.z - z) < r * 1.9 + 8 * WS) return false;
       for (let k = 0; k < 32; k++) {
         const a = k / 32 * Math.PI * 2, d = r * (k % 2 ? 0.6 : 1.15);
@@ -3313,6 +3793,49 @@ var World = class {
     ];
     const added = [];
     const clear = (x, z, r) => {
+      if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < ((o.placementR ?? o.r) + r) * 1.2 + 18 * WS)) return false;
+      for (const w of this.sites.wrecks) if (Math.hypot(w.x - x, w.z - z) < r * 1.9 + 8 * WS) return false;
+      for (let k = 0; k < 32; k++) {
+        const a = k / 32 * Math.PI * 2, d = r * (k % 2 ? 0.6 : 1.15);
+        const px = Math.floor(x + Math.cos(a) * d), pz = Math.floor(z + Math.sin(a) * d);
+        if (px < 2 || pz < 2 || px >= W - 2 || pz >= D - 2 || this.surf[px + pz * W] > SEA - 4) return false;
+      }
+      return true;
+    };
+    for (const [name, type, r0, rr, p0, pr] of NEW) {
+      for (let tries = 0; tries < 6e3; tries++) {
+        const r = WS * (r0 + rnd2() * rr);
+        const x = 24 + r * 1.8 + rnd2() * (PREVIOUS_MAP_W - 48 - 3.6 * r), z = 24 + r * 1.8 + rnd2() * (PREVIOUS_MAP_W - 48 - 3.6 * r);
+        if (!clear(x, z, r)) continue;
+        const o = { name, x, z, r, peak: PS * (p0 + rnd2() * pr), type, late: true, frontier: true };
+        if (type === "cove") o.mouth = rnd2() * Math.PI * 2;
+        if (type === "twin") o.axis = rnd2() * Math.PI;
+        this.islands.push(o);
+        added.push(o);
+        break;
+      }
+    }
+    for (const o of added) this.terrainFor(o, this.islands.indexOf(o));
+    for (const o of added) {
+      if (o.r >= 42 && !["volcano", "atoll", "sandbar", "twin"].includes(o.type)) this.buildVillage(o, o.r >= 48 ? "village" : "hamlet");
+    }
+    for (const o of added) this.decorateIsland(o, this.islands.indexOf(o), rnd2);
+    for (const o of added) this.plantArea(o, rnd2);
+  }
+  extendedIslands() {
+    const rnd2 = mulberry32(this.seed * 41 + 23);
+    const NEW = [
+      ["Mariner’s Rest", "forest", 17, 7, 8, 4],
+      ["Copperleaf Haven", "jungle", 17, 7, 9, 4],
+      ["Sable Harbor", "palm", 16, 7, 5, 3],
+      ["Kingsport Isle", "forest", 18, 7, 10, 4],
+      ["Morrow’s Green", "jungle", 17, 7, 8, 4],
+      ["Lanternfall", "cove", 16, 7, 9, 4],
+      ["Crown Harbor", "palm", 18, 7, 6, 3],
+      ["Stonewake Isle", "rock", 18, 7, 13, 5]
+    ];
+    const added = [];
+    const clear = (x, z, r) => {
       if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < (o.r + r) * 1.2 + 18 * WS)) return false;
       for (const w of this.sites.wrecks) if (Math.hypot(w.x - x, w.z - z) < r * 1.9 + 8 * WS) return false;
       for (let k = 0; k < 32; k++) {
@@ -3327,15 +3850,14 @@ var World = class {
         const r = WS * (r0 + rnd2() * rr);
         const x = 24 + r * 1.8 + rnd2() * (W - 48 - 3.6 * r), z = 24 + r * 1.8 + rnd2() * (D - 48 - 3.6 * r);
         if (!clear(x, z, r)) continue;
-        const o = { name, x, z, r, peak: PS * (p0 + rnd2() * pr), type, late: true, frontier: true };
-        if (type === "cove") o.mouth = rnd2() * Math.PI * 2;
-        if (type === "twin") o.axis = rnd2() * Math.PI;
+        const o = { name, x, z, r, peak: PS * (p0 + rnd2() * pr), type, late: true, extended: true };
         this.islands.push(o);
         added.push(o);
         break;
       }
     }
     for (const o of added) this.terrainFor(o, this.islands.indexOf(o));
+    for (let i = 0; i < added.length; i++) this.buildVillage(added[i], i < 3 ? "major" : "village");
     for (const o of added) this.decorateIsland(o, this.islands.indexOf(o), rnd2);
     for (const o of added) this.plantArea(o, rnd2);
   }
@@ -3451,7 +3973,7 @@ var World = class {
 };
 
 // src/water.js
-import * as THREE2 from "three";
+import * as THREE3 from "three";
 var MAX_SHIPS = 10;
 var waveState = { amp: 1 };
 var waveHeight = (x, z, t) => waveState.amp * (0.2 * Math.sin(0.11 * x + 0.85 * t) + 0.15 * Math.sin(0.15 * z - 1.05 * t + 1.3) + 0.08 * Math.sin(0.21 * (x + z) + 1.6 * t));
@@ -3536,8 +4058,14 @@ void main() {
   float fres = pow(1.0 - max(dot(n, V), 0.0), 4.0);
   float diff = 0.62 + 0.38 * max(dot(n, uSunDir), 0.0);
   vec3 Hh = normalize(uSunDir + V);
-  float spec = pow(max(dot(n, Hh), 0.0), 90.0) * uSpec;
+  float ndh = max(dot(n, Hh), 0.0);
+  float spec = (pow(ndh, 90.0) + 0.7 * pow(ndh, 220.0)) * uSpec;
   vec3 col = base * diff * uLight + uSky * fres * 0.35 + uSunCol * spec;
+  if (inside > 0.5 && depth < 0.42) {
+    float caustic = pow(max(0.0, sin((vWorld.x + vWorld.z * 0.72) * 0.18 + uTime * 0.6)
+      * sin((vWorld.z - vWorld.x * 0.63) * 0.2 - uTime * 0.45)), 6.0);
+    col += uSunCol * caustic * (1.0 - smoothstep(0.08, 0.42, depth)) * uLight * 0.18;
+  }
   float shore = (1.0 - smoothstep(0.0, 0.17, depth)) * inside;
   float band = step(0.6, 0.5 + 0.5 * sin(depth * 70.0 - uTime * 2.2 + vWorld.x * 0.13 + vWorld.z * 0.07));
   float foam = shore * band + (1.0 - smoothstep(0.0, 0.035, depth)) * inside * 0.8;
@@ -3556,33 +4084,33 @@ var Ocean = class {
   constructor(scene) {
     const size2 = 480, seg = 160;
     this.step = size2 / seg;
-    const g = new THREE2.PlaneGeometry(size2, size2, seg, seg);
+    const g = new THREE3.PlaneGeometry(size2, size2, seg, seg);
     g.rotateX(-Math.PI / 2);
     this.depthData = new Uint8Array(W * D * 4).fill(255);
-    this.depthTex = new THREE2.DataTexture(this.depthData, W, D, THREE2.RGBAFormat);
-    this.depthTex.magFilter = THREE2.LinearFilter;
-    this.depthTex.minFilter = THREE2.LinearFilter;
-    this.depthTex.wrapS = this.depthTex.wrapT = THREE2.ClampToEdgeWrapping;
+    this.depthTex = new THREE3.DataTexture(this.depthData, W, D, THREE3.RGBAFormat);
+    this.depthTex.magFilter = THREE3.LinearFilter;
+    this.depthTex.minFilter = THREE3.LinearFilter;
+    this.depthTex.wrapS = this.depthTex.wrapT = THREE3.ClampToEdgeWrapping;
     this.depthTex.needsUpdate = true;
-    this.uniforms = THREE2.UniformsUtils.merge([THREE2.UniformsLib.fog, {
+    this.uniforms = THREE3.UniformsUtils.merge([THREE3.UniformsLib.fog, {
       uTime: { value: 0 },
       uAmp: { value: 1 },
       uDepth: { value: null },
-      uDeep: { value: new THREE2.Color(1929103) },
-      uShallow: { value: new THREE2.Color(4178368) },
-      uFoam: { value: new THREE2.Color(16055291) },
-      uSunDir: { value: new THREE2.Vector3(0.3, 0.8, 0.3) },
-      uSunCol: { value: new THREE2.Color(16774108) },
-      uSky: { value: new THREE2.Color(12575472) },
+      uDeep: { value: new THREE3.Color(1929103) },
+      uShallow: { value: new THREE3.Color(4178368) },
+      uFoam: { value: new THREE3.Color(16055291) },
+      uSunDir: { value: new THREE3.Vector3(0.3, 0.8, 0.3) },
+      uSunCol: { value: new THREE3.Color(16774108) },
+      uSky: { value: new THREE3.Color(12575472) },
       uLight: { value: 1 },
       uSpec: { value: 1 },
       uStorm: { value: 0 }
     }]);
     this.uniforms.uDepth.value = this.depthTex;
-    this.uniforms.uShipA = { value: Array.from({ length: MAX_SHIPS }, () => new THREE2.Vector4()) };
-    this.uniforms.uShipB = { value: Array.from({ length: MAX_SHIPS }, () => new THREE2.Vector4()) };
-    this.mat = new THREE2.ShaderMaterial({ uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, fog: true });
-    this.mesh = new THREE2.Mesh(g, this.mat);
+    this.uniforms.uShipA = { value: Array.from({ length: MAX_SHIPS }, () => new THREE3.Vector4()) };
+    this.uniforms.uShipB = { value: Array.from({ length: MAX_SHIPS }, () => new THREE3.Vector4()) };
+    this.mat = new THREE3.ShaderMaterial({ uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, fog: true });
+    this.mesh = new THREE3.Mesh(g, this.mat);
     this.mesh.position.y = WATER_Y;
     this.mesh.renderOrder = 2;
     this.mesh.frustumCulled = false;
@@ -3636,10 +4164,10 @@ var Ocean = class {
 };
 
 // src/sky.js
-import * as THREE4 from "three";
+import * as THREE5 from "three";
 
 // src/textures.js
-import * as THREE3 from "three";
+import * as THREE4 from "three";
 
 // src/paint.js
 var PS2 = 64;
@@ -4700,14 +5228,14 @@ function makeTextureArray(renderer) {
       data[o + 3] = src[k + 3];
     }
   });
-  const tex = new THREE3.DataArrayTexture(data, N2, N2, tiles.length);
-  tex.format = THREE3.RGBAFormat;
-  tex.type = THREE3.UnsignedByteType;
-  tex.magFilter = THREE3.LinearFilter;
-  tex.minFilter = THREE3.LinearMipmapLinearFilter;
+  const tex = new THREE4.DataArrayTexture(data, N2, N2, tiles.length);
+  tex.format = THREE4.RGBAFormat;
+  tex.type = THREE4.UnsignedByteType;
+  tex.magFilter = THREE4.LinearFilter;
+  tex.minFilter = THREE4.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
-  tex.wrapS = tex.wrapT = THREE3.RepeatWrapping;
-  tex.colorSpace = THREE3.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE4.RepeatWrapping;
+  tex.colorSpace = THREE4.SRGBColorSpace;
   if (renderer) tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   tex.needsUpdate = true;
   return tex;
@@ -4779,11 +5307,11 @@ function cloudTexture() {
     img.data[i + 3] = 255;
   }
   x.putImageData(img, 0, 0);
-  const t = new THREE3.CanvasTexture(c);
-  t.magFilter = THREE3.LinearFilter;
-  t.minFilter = THREE3.LinearMipmapLinearFilter;
+  const t = new THREE4.CanvasTexture(c);
+  t.magFilter = THREE4.LinearFilter;
+  t.minFilter = THREE4.LinearMipmapLinearFilter;
   t.generateMipmaps = true;
-  t.wrapS = t.wrapT = THREE3.RepeatWrapping;
+  t.wrapS = t.wrapT = THREE4.RepeatWrapping;
   return t;
 }
 function periodic(seed, period) {
@@ -4840,10 +5368,10 @@ function makeDetailTexture(renderer) {
     data[i + 2] = cl(rock);
     data[i + 3] = cl(dirt2);
   }
-  const tex = new THREE3.DataTexture(data, N2, N2, THREE3.RGBAFormat);
-  tex.wrapS = tex.wrapT = THREE3.RepeatWrapping;
-  tex.magFilter = THREE3.LinearFilter;
-  tex.minFilter = THREE3.LinearMipmapLinearFilter;
+  const tex = new THREE4.DataTexture(data, N2, N2, THREE4.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE4.RepeatWrapping;
+  tex.magFilter = THREE4.LinearFilter;
+  tex.minFilter = THREE4.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
   if (renderer) tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   tex.needsUpdate = true;
@@ -4875,8 +5403,8 @@ function makeFrondTexture() {
   x.moveTo(32, 0);
   x.lineTo(32, 256);
   x.stroke();
-  const tex = new THREE3.CanvasTexture(c);
-  tex.colorSpace = THREE3.SRGBColorSpace;
+  const tex = new THREE4.CanvasTexture(c);
+  tex.colorSpace = THREE4.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;
 }
@@ -4893,7 +5421,7 @@ var K = [
   [338, 1913682, 528671, 11847423, 0.75, 5796518, 3421247, 0.72, 795702, 1920346, 0.95, 2765896],
   [360, 15773820, 7311296, 16759175, 0.9, 12175584, 6968384, 0.62, 2908024, 5810600, 0.3, 16767424]
 ];
-var STORM = { horizon: new THREE4.Color(7305859), zenith: new THREE4.Color(4608090), deep: new THREE4.Color(2835536), shallow: new THREE4.Color(5208700), clouds: new THREE4.Color(8226446) };
+var STORM = { horizon: new THREE5.Color(7305859), zenith: new THREE5.Color(4608090), deep: new THREE5.Color(2835536), shallow: new THREE5.Color(5208700), clouds: new THREE5.Color(8226446) };
 var SKY_VERT = `varying vec3 vDir;
 void main() { vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = vec4(p.xy, p.w * 0.99999, p.w); }`;
 var SKY_FRAG = `uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uSunDir; uniform vec3 uGlow; uniform float uGlowK;
@@ -4943,30 +5471,30 @@ function discTexture(inner, outer) {
   g.addColorStop(1, "rgba(255,255,255,0)");
   x.fillStyle = g;
   x.fillRect(0, 0, 128, 128);
-  const t = new THREE4.CanvasTexture(c);
-  t.colorSpace = THREE4.SRGBColorSpace;
+  const t = new THREE5.CanvasTexture(c);
+  t.colorSpace = THREE5.SRGBColorSpace;
   return t;
 }
 var Sky = class {
   constructor(scene, quality) {
     this.scene = scene;
-    this.hemi = new THREE4.HemisphereLight(16777215, 4473924, 1);
-    this.sun = new THREE4.DirectionalLight(16777215, 1.5);
+    this.hemi = new THREE5.HemisphereLight(16777215, 4473924, 1);
+    this.sun = new THREE5.DirectionalLight(16777215, 1.5);
     this.sun.shadow.camera.near = 1;
     this.sun.shadow.camera.far = 320;
     this.sun.shadow.bias = -6e-4;
     this.sun.shadow.normalBias = 0.05;
     scene.add(this.hemi, this.sun, this.sun.target);
     this.fogFar = 160;
-    scene.fog = new THREE4.Fog(12903664, 55, 160);
+    scene.fog = new THREE5.Fog(12903664, 55, 160);
     scene.background = null;
-    this.keys = K.map((k) => ({ t: k[0], horizon: new THREE4.Color(k[1]), zenith: new THREE4.Color(k[2]), sun: new THREE4.Color(k[3]), sunI: k[4], hs: new THREE4.Color(k[5]), hg: new THREE4.Color(k[6]), hi: k[7], deep: new THREE4.Color(k[8]), shallow: new THREE4.Color(k[9]), stars: k[10], clouds: new THREE4.Color(k[11]) }));
-    this.horizon = new THREE4.Color();
-    this.zenith = new THREE4.Color();
-    this.deepWater = new THREE4.Color();
-    this.shallowWater = new THREE4.Color();
-    this.cloudColor = new THREE4.Color();
-    this.lightDir = new THREE4.Vector3(0, 1, 0);
+    this.keys = K.map((k) => ({ t: k[0], horizon: new THREE5.Color(k[1]), zenith: new THREE5.Color(k[2]), sun: new THREE5.Color(k[3]), sunI: k[4], hs: new THREE5.Color(k[5]), hg: new THREE5.Color(k[6]), hi: k[7], deep: new THREE5.Color(k[8]), shallow: new THREE5.Color(k[9]), stars: k[10], clouds: new THREE5.Color(k[11]) }));
+    this.horizon = new THREE5.Color();
+    this.zenith = new THREE5.Color();
+    this.deepWater = new THREE5.Color();
+    this.shallowWater = new THREE5.Color();
+    this.cloudColor = new THREE5.Color();
+    this.lightDir = new THREE5.Vector3(0, 1, 0);
     this.isNight = false;
     this.night = 0;
     this.day = 1;
@@ -4974,15 +5502,15 @@ var Sky = class {
     this.lightLevel = 1;
     this.specular = 1;
     this.flash = 0;
-    this.domeU = { uZenith: { value: new THREE4.Color() }, uHorizon: { value: new THREE4.Color() }, uSunDir: { value: new THREE4.Vector3() }, uGlow: { value: new THREE4.Color(16773328) }, uGlowK: { value: 1 } };
-    this.dome = new THREE4.Mesh(new THREE4.SphereGeometry(450, 32, 16), new THREE4.ShaderMaterial({ uniforms: this.domeU, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE4.BackSide, depthWrite: false, fog: false }));
+    this.domeU = { uZenith: { value: new THREE5.Color() }, uHorizon: { value: new THREE5.Color() }, uSunDir: { value: new THREE5.Vector3() }, uGlow: { value: new THREE5.Color(16773328) }, uGlowK: { value: 1 } };
+    this.dome = new THREE5.Mesh(new THREE5.SphereGeometry(450, 32, 16), new THREE5.ShaderMaterial({ uniforms: this.domeU, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE5.BackSide, depthWrite: false, fog: false }));
     this.dome.renderOrder = -10;
     this.dome.frustumCulled = false;
     scene.add(this.dome);
-    this.cloudU = { uTex: { value: cloudTexture() }, uColor: { value: new THREE4.Color() }, uShade: { value: new THREE4.Color() }, uOff: { value: new THREE4.Vector2() }, uOpacity: { value: 0.85 }, uCam: { value: new THREE4.Vector3() }, uSun: { value: new THREE4.Vector2(1, 0) }, uCover: { value: 0.52 } };
-    const cg = new THREE4.PlaneGeometry(900, 900);
+    this.cloudU = { uTex: { value: cloudTexture() }, uColor: { value: new THREE5.Color() }, uShade: { value: new THREE5.Color() }, uOff: { value: new THREE5.Vector2() }, uOpacity: { value: 0.85 }, uCam: { value: new THREE5.Vector3() }, uSun: { value: new THREE5.Vector2(1, 0) }, uCover: { value: 0.52 } };
+    const cg = new THREE5.PlaneGeometry(900, 900);
     cg.rotateX(Math.PI / 2);
-    this.clouds = new THREE4.Mesh(cg, new THREE4.ShaderMaterial({ uniforms: this.cloudU, vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, transparent: true, depthWrite: false, fog: false, side: THREE4.DoubleSide }));
+    this.clouds = new THREE5.Mesh(cg, new THREE5.ShaderMaterial({ uniforms: this.cloudU, vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, transparent: true, depthWrite: false, fog: false, side: THREE5.DoubleSide }));
     this.clouds.position.y = 74;
     this.clouds.renderOrder = -5;
     this.clouds.frustumCulled = false;
@@ -4995,20 +5523,20 @@ var Sky = class {
       p[i * 3 + 1] = Math.cos(ph) * 300;
       p[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * 300;
     }
-    const sg = new THREE4.BufferGeometry();
-    sg.setAttribute("position", new THREE4.BufferAttribute(p, 3));
-    this.stars = new THREE4.Points(sg, new THREE4.PointsMaterial({ color: 16774880, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+    const sg = new THREE5.BufferGeometry();
+    sg.setAttribute("position", new THREE5.BufferAttribute(p, 3));
+    this.stars = new THREE5.Points(sg, new THREE5.PointsMaterial({ color: 16774880, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
     this.stars.frustumCulled = false;
     this.stars.renderOrder = -9;
     scene.add(this.stars);
-    this.sunSprite = new THREE4.Sprite(new THREE4.SpriteMaterial({ map: discTexture("#fff6d8", "rgba(255,214,140,0.35)"), fog: false, depthWrite: false, transparent: true }));
+    this.sunSprite = new THREE5.Sprite(new THREE5.SpriteMaterial({ map: discTexture("#fff6d8", "rgba(255,214,140,0.35)"), fog: false, depthWrite: false, transparent: true }));
     this.sunSprite.scale.set(46, 46, 1);
     this.sunSprite.renderOrder = -8;
-    this.moonSprite = new THREE4.Sprite(new THREE4.SpriteMaterial({ map: discTexture("#eef3ff", "rgba(190,210,255,0.25)"), fog: false, depthWrite: false, transparent: true }));
+    this.moonSprite = new THREE5.Sprite(new THREE5.SpriteMaterial({ map: discTexture("#eef3ff", "rgba(190,210,255,0.25)"), fog: false, depthWrite: false, transparent: true }));
     this.moonSprite.scale.set(30, 30, 1);
     this.moonSprite.renderOrder = -8;
     scene.add(this.sunSprite, this.moonSprite);
-    this._d = new THREE4.Vector3();
+    this._d = new THREE5.Vector3();
     this.setQuality(quality);
   }
   setQuality(q) {
@@ -5095,177 +5623,6 @@ var Sky = class {
 
 // src/ship.js
 import * as THREE7 from "three";
-
-// src/geo.js
-import * as THREE5 from "three";
-var _c2 = new THREE5.Color();
-var TRI = [0, 1, 2, 2, 1, 3];
-var GRID = [0, 1 / 3, 2 / 3, 1];
-var GeoBuilder = class {
-  constructor(o = {}) {
-    this.p = [];
-    this.n = [];
-    this.c = [];
-    this.uv = [];
-    this.l = [];
-    this.round = o.round || 0;
-  }
-  box(x0, y0, z0, x1, y1, z1, color, layer = T.white, uvScale = 2) {
-    const r = Math.min(this.round, 0.45 * Math.min(x1 - x0, y1 - y0, z1 - z0));
-    if (r > 4e-3) return this.rbox(x0, y0, z0, x1, y1, z1, color, layer, uvScale, r);
-    _c2.set(color);
-    for (let f = 0; f < 6; f++) {
-      const F = FACES[f], d = F.dir;
-      for (const i of TRI) {
-        const cr = F.corners[i];
-        const px = cr[0] ? x1 : x0, py = cr[1] ? y1 : y0, pz = cr[2] ? z1 : z0;
-        this.p.push(px, py, pz);
-        this.n.push(d[0], d[1], d[2]);
-        this.c.push(_c2.r, _c2.g, _c2.b);
-        if (f < 2) this.uv.push(pz * uvScale, py * uvScale);
-        else if (f < 4) this.uv.push(px * uvScale, pz * uvScale);
-        else this.uv.push(px * uvScale, py * uvScale);
-        this.l.push(layer);
-      }
-    }
-    return this;
-  }
-  rbox(x0, y0, z0, x1, y1, z1, color, layer, uvScale, r) {
-    _c2.set(color);
-    const lo = [x0, y0, z0], hi = [x1, y1, z1];
-    const map = (a, u) => u === 0 ? lo[a] : u === 1 ? hi[a] : u < 0.5 ? lo[a] + r : hi[a] - r;
-    const P = [0, 0, 0], Q = [0, 0, 0];
-    const vert = (F, f, s, t) => {
-      const c0 = F.corners[0], c1 = F.corners[1], c2 = F.corners[2];
-      for (let a = 0; a < 3; a++) {
-        const u = c0[a] + (c1[a] - c0[a]) * s + (c2[a] - c0[a]) * t;
-        P[a] = map(a, Math.round(u * 3) / 3);
-        Q[a] = Math.min(hi[a] - r, Math.max(lo[a] + r, P[a]));
-      }
-      let dx = P[0] - Q[0], dy = P[1] - Q[1], dz = P[2] - Q[2];
-      const l = Math.hypot(dx, dy, dz);
-      if (l > 1e-7) {
-        dx /= l;
-        dy /= l;
-        dz /= l;
-        P[0] = Q[0] + dx * r;
-        P[1] = Q[1] + dy * r;
-        P[2] = Q[2] + dz * r;
-      } else {
-        dx = F.dir[0];
-        dy = F.dir[1];
-        dz = F.dir[2];
-      }
-      this.p.push(P[0], P[1], P[2]);
-      this.n.push(dx, dy, dz);
-      this.c.push(_c2.r, _c2.g, _c2.b);
-      if (f < 2) this.uv.push(P[2] * uvScale, P[1] * uvScale);
-      else if (f < 4) this.uv.push(P[0] * uvScale, P[2] * uvScale);
-      else this.uv.push(P[0] * uvScale, P[1] * uvScale);
-      this.l.push(layer);
-    };
-    for (let f = 0; f < 6; f++) {
-      const F = FACES[f];
-      for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
-        const s0 = GRID[i], s1 = GRID[i + 1], t0 = GRID[j], t1 = GRID[j + 1];
-        vert(F, f, s0, t0);
-        vert(F, f, s1, t0);
-        vert(F, f, s0, t1);
-        vert(F, f, s0, t1);
-        vert(F, f, s1, t0);
-        vert(F, f, s1, t1);
-      }
-    }
-    return this;
-  }
-  // one triangle with its own normals and texture coordinates
-  tri(a, na, ua, b, nb, ub, c, nc, uc, color, layer = T.white) {
-    _c2.set(color);
-    for (const [p, n, u] of [[a, na, ua], [b, nb, ub], [c, nc, uc]]) {
-      this.p.push(p[0], p[1], p[2]);
-      this.n.push(n[0], n[1], n[2]);
-      this.c.push(_c2.r, _c2.g, _c2.b);
-      this.uv.push(u[0], u[1]);
-      this.l.push(layer);
-    }
-    return this;
-  }
-  // A quad a b / c d (a and d opposite corners), wound so that it faces n whatever order the corners came in.
-  quad(a, b, c, d, n, color, layer = T.white, ua = [0, 0], ub = [1, 0], uc = [0, 1], ud = [1, 1]) {
-    const e1x = b[0] - a[0], e1y = b[1] - a[1], e1z = b[2] - a[2], e2x = c[0] - a[0], e2y = c[1] - a[1], e2z = c[2] - a[2];
-    const gx = e1y * e2z - e1z * e2y, gy = e1z * e2x - e1x * e2z, gz = e1x * e2y - e1y * e2x;
-    if (gx * n[0] + gy * n[1] + gz * n[2] >= 0) return this.tri(a, n, ua, b, n, ub, c, n, uc, color, layer).tri(c, n, uc, b, n, ub, d, n, ud, color, layer);
-    return this.tri(a, n, ua, c, n, uc, b, n, ub, color, layer).tri(c, n, uc, d, n, ud, b, n, ub, color, layer);
-  }
-  // a triangle wound to face the way its normals point
-  otri(p, np, up, q, nq, uq, r, nr, ur, color, layer) {
-    const ex = q[0] - p[0], ey = q[1] - p[1], ez = q[2] - p[2], fx = r[0] - p[0], fy = r[1] - p[1], fz = r[2] - p[2];
-    const g = (ey * fz - ez * fy) * (np[0] + nq[0] + nr[0]) + (ez * fx - ex * fz) * (np[1] + nq[1] + nr[1]) + (ex * fy - ey * fx) * (np[2] + nq[2] + nr[2]);
-    return g >= 0 ? this.tri(p, np, up, q, nq, uq, r, nr, ur, color, layer) : this.tri(p, np, up, r, nr, ur, q, nq, uq, color, layer);
-  }
-  // one flat-shaded triangle facing n
-  face(p, q, r, n, color, layer = T.white) {
-    const ex = q[0] - p[0], ey = q[1] - p[1], ez = q[2] - p[2], fx = r[0] - p[0], fy = r[1] - p[1], fz = r[2] - p[2];
-    const g = (ey * fz - ez * fy) * n[0] + (ez * fx - ex * fz) * n[1] + (ex * fy - ey * fx) * n[2];
-    const u = (v) => [v[0] + v[2], v[1]];
-    return g >= 0 ? this.tri(p, n, u(p), q, n, u(q), r, n, u(r), color, layer) : this.tri(p, n, u(p), r, n, u(r), q, n, u(q), color, layer);
-  }
-  // a tapered round post from (x0, y0, z0) to (x1, y1, z1)
-  cyl(x0, y0, z0, x1, y1, z1, r0, r12, color, layer = T.white, segs = 10, caps = true) {
-    const ax = new THREE5.Vector3(x1 - x0, y1 - y0, z1 - z0), len = ax.length();
-    ax.divideScalar(len);
-    const u = Math.abs(ax.y) < 0.9 ? new THREE5.Vector3(0, 1, 0) : new THREE5.Vector3(1, 0, 0);
-    const e1 = new THREE5.Vector3().crossVectors(ax, u).normalize(), e2 = new THREE5.Vector3().crossVectors(ax, e1);
-    const ring = (k, r, y) => {
-      const a = k / segs * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
-      return [[(y ? x1 : x0) + (e1.x * c + e2.x * s) * r, (y ? y1 : y0) + (e1.y * c + e2.y * s) * r, (y ? z1 : z0) + (e1.z * c + e2.z * s) * r], [e1.x * c + e2.x * s, e1.y * c + e2.y * s, e1.z * c + e2.z * s]];
-    };
-    for (let k = 0; k < segs; k++) {
-      const [a0, n0] = ring(k, r0, 0), [a1, n1] = ring(k + 1, r0, 0), [b0] = ring(k, r12, 1), [b1] = ring(k + 1, r12, 1);
-      const u0 = [k / segs * 2, 0], u1 = [(k + 1) / segs * 2, 0], v0 = [k / segs * 2, len], v1 = [(k + 1) / segs * 2, len];
-      this.otri(a0, n0, u0, b1, n1, v1, b0, n0, v0, color, layer).otri(a0, n0, u0, a1, n1, u1, b1, n1, v1, color, layer);
-      if (caps) {
-        const na = [-ax.x, -ax.y, -ax.z], nb = [ax.x, ax.y, ax.z];
-        this.otri([x0, y0, z0], na, [0, 0], a0, na, [0, 0], a1, na, [0, 0], color, layer);
-        this.otri([x1, y1, z1], nb, [0, 0], b1, nb, [0, 0], b0, nb, [0, 0], color, layer);
-      }
-    }
-    return this;
-  }
-  get empty() {
-    return this.p.length === 0;
-  }
-  build() {
-    const g = new THREE5.BufferGeometry();
-    g.setAttribute("position", new THREE5.Float32BufferAttribute(this.p, 3));
-    g.setAttribute("normal", new THREE5.Float32BufferAttribute(this.n, 3));
-    g.setAttribute("color", new THREE5.Float32BufferAttribute(this.c, 3));
-    g.setAttribute("tuv", new THREE5.Float32BufferAttribute(this.uv, 2));
-    g.setAttribute("layer", new THREE5.Float32BufferAttribute(this.l, 1));
-    g.computeBoundingSphere();
-    return g;
-  }
-};
-var glowTex = null;
-function glowTexture() {
-  if (glowTex) return glowTex;
-  const c = document.createElement("canvas");
-  c.width = c.height = 64;
-  const x = c.getContext("2d");
-  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, "rgba(255,255,255,1)");
-  g.addColorStop(0.25, "rgba(255,255,255,0.55)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  x.fillStyle = g;
-  x.fillRect(0, 0, 64, 64);
-  glowTex = new THREE5.CanvasTexture(c);
-  return glowTex;
-}
-function glowSprite(color, size2, opacity = 1) {
-  const s = new THREE5.Sprite(new THREE5.SpriteMaterial({ map: glowTexture(), color, transparent: true, blending: THREE5.AdditiveBlending, depthWrite: false, opacity }));
-  s.scale.set(size2, size2, 1);
-  return s;
-}
 
 // src/materials.js
 import * as THREE6 from "three";
@@ -5395,6 +5752,39 @@ var SHIP_NAMES = {
   navy: ["The Crown’s Lantern", "The Dauntless", "The Steadfast", "The Warden"],
   pirate: ["The Red Gull", "The Black Maren", "The Gallows Wit", "The Rusty Hook"]
 };
+var SHIP_DESIGNS = {
+  sloop: [{ id: "sloop", label: "Sloop", speed: 14, hp: 120, guns: 2, turn: 1, sailWidth: 4.9, sailHeight: 4.8 }],
+  merchant: [
+    { id: "merchantman", label: "Merchantman", speed: 9.5, hp: 105, guns: 2, turn: 0.82, sailWidth: 5.1, sailHeight: 4.5, foremast: true },
+    { id: "packet", label: "Packet ship", speed: 12.5, hp: 78, guns: 1, turn: 1.2, sailWidth: 5.3, sailHeight: 4.4 }
+  ],
+  navy: [
+    { id: "frigate", label: "Frigate", speed: 10.5, hp: 180, guns: 3, turn: 0.78, sailWidth: 5.1, sailHeight: 4.7, foremast: true },
+    { id: "cutter", label: "Cutter", speed: 14, hp: 128, guns: 2, turn: 1.25, sailWidth: 4.4, sailHeight: 5.1 }
+  ],
+  pirate: [
+    { id: "brig", label: "Brig", speed: 11.2, hp: 130, guns: 3, turn: 0.9, sailWidth: 5, sailHeight: 4.7, foremast: true },
+    { id: "raider", label: "Raider", speed: 14, hp: 92, guns: 2, turn: 1.2, sailWidth: 4.6, sailHeight: 4.9 }
+  ],
+  hollow: [
+    { id: "wraith", label: "Wraith ship", speed: 11.4, hp: 110, guns: 2, turn: 0.95, sailWidth: 4.9, sailHeight: 4.8 },
+    { id: "dreadship", label: "Dreadship", speed: 10.2, hp: 260, guns: 3, turn: 0.8, sailWidth: 5.1, sailHeight: 4.8, foremast: true }
+  ]
+};
+var PLAYER_VESSELS = [
+  { id: "sloop", label: "Sloop", speed: 14, hp: 120, guns: 2, turn: 1, sailWidth: 4.9, sailHeight: 4.8 },
+  { id: "cutter", label: "Cutter", speed: 15.5, hp: 155, guns: 2, turn: 1.28, sailWidth: 4.4, sailHeight: 4.8 },
+  { id: "brigantine", label: "Brigantine", speed: 12.8, hp: 215, guns: 3, turn: 1, sailWidth: 5, sailHeight: 4.8, foremast: true },
+  { id: "frigate", label: "Frigate", speed: 10.5, hp: 285, guns: 3, turn: 0.78, sailWidth: 5.1, sailHeight: 4.7, foremast: true }
+];
+function playerVessel(id = "sloop") {
+  return PLAYER_VESSELS.find((v) => v.id === id) || PLAYER_VESSELS[0];
+}
+function shipDesignFor(kind, nameIx = 0, variant = "normal") {
+  const designs = SHIP_DESIGNS[kind] || SHIP_DESIGNS.sloop;
+  if (kind === "hollow") return variant === "flagship" ? designs[1] : designs[0];
+  return designs[Math.abs(nameIx | 0) % designs.length];
+}
 function shadeHex(hex, k) {
   const c = new THREE7.Color(hex);
   c.multiplyScalar(k);
@@ -5521,18 +5911,101 @@ function gunPlace(g) {
   const p = gunPlace1({ z: g.z / SCALE, y: g.y / SCALE, side: g.side });
   return { cx: p.cx * SCALE, z: g.z, px: p.px * SCALE, py: p.py * SCALE, stand: p.stand * SCALE, side: g.side };
 }
-var HULL_CIRCLES = [-5.45, -4.1, -2.6, -1, 0.6, 2.2, 3.8, 5].map((z) => [z, Math.max(0.55, halfWidthAt1(z) * (z < -4 ? 0.92 : 1))]);
-var OUTLINE = (() => {
-  const pts = [[0, SHIP1.bow + 0.35]];
-  for (let z = SHIP1.bow + 0.8; z <= SHIP1.stern - 0.25; z += 0.45) {
-    const w = halfWidthAt1(z) * 0.96;
-    pts.push([w, z], [-w, z]);
+var HULL_FOOTPRINT = (() => {
+  const pts = [], steps = 56;
+  for (let i = 0; i <= steps; i++) {
+    const z = SHIP1.bow + (SHIP1.stern - SHIP1.bow) * (i / steps), x = hullHalfAt1(z, 0.12);
+    pts.push([x, z], [-x, z]);
   }
-  for (let x = -1.4; x <= 1.4; x += 0.45) pts.push([x, SHIP1.stern - 0.15]);
-  for (let z = SHIP1.bow + 1.5; z <= SHIP1.stern - 0.8; z += 1.4) pts.push([0, z]);
-  return pts;
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const turn2 = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const lower = [], upper = [];
+  for (const p of pts) {
+    while (lower.length > 1 && turn2(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (upper.length > 1 && turn2(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
 })();
-function buildHull(gb, pal) {
+function polygonContact(a, b) {
+  let depth = Infinity, nx = 0, nz = 0;
+  const test = (points) => {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i], q = points[(i + 1) % points.length], ex = q[0] - p[0], ez = q[1] - p[1], len = Math.hypot(ex, ez);
+      if (len < 1e-8) continue;
+      const ax2 = -ez / len, az2 = ex / len;
+      let amin = Infinity, amax2 = -Infinity, bmin2 = Infinity, bmax = -Infinity;
+      for (const v of a) {
+        const d = v[0] * ax2 + v[1] * az2;
+        amin = Math.min(amin, d);
+        amax2 = Math.max(amax2, d);
+      }
+      for (const v of b) {
+        const d = v[0] * ax2 + v[1] * az2;
+        bmin2 = Math.min(bmin2, d);
+        bmax = Math.max(bmax, d);
+      }
+      const plus = amax2 - bmin2, minus = bmax - amin;
+      if (plus <= 0 || minus <= 0) return false;
+      if (plus < depth) {
+        depth = plus;
+        nx = ax2;
+        nz = az2;
+      }
+      if (minus < depth) {
+        depth = minus;
+        nx = -ax2;
+        nz = -az2;
+      }
+    }
+    return true;
+  };
+  if (!test(a) || !test(b)) return null;
+  let ax = 0, az = 0, bx = 0, bz = 0, an = 0, bn = 0, amax = -Infinity, bmin = Infinity;
+  for (const p of a) amax = Math.max(amax, p[0] * nx + p[1] * nz);
+  for (const p of b) bmin = Math.min(bmin, p[0] * nx + p[1] * nz);
+  for (const p of a) if (amax - (p[0] * nx + p[1] * nz) < 0.03) {
+    ax += p[0];
+    az += p[1];
+    an++;
+  }
+  for (const p of b) if (p[0] * nx + p[1] * nz - bmin < 0.03) {
+    bx += p[0];
+    bz += p[1];
+    bn++;
+  }
+  return { depth, nx, nz, x: (ax / an + bx / bn) * 0.5, z: (az / an + bz / bn) * 0.5 };
+}
+function footprintAxes(points, out) {
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i], q = points[(i + 1) % points.length], dx = q[0] - p[0], dz = q[1] - p[1], len = Math.hypot(dx, dz) || 1;
+    const ax = -dz / len, az = dx / len;
+    let min = Infinity, max = -Infinity;
+    for (const v of points) {
+      const d = v[0] * ax + v[1] * az;
+      min = Math.min(min, d);
+      max = Math.max(max, d);
+    }
+    const axis = out[i] || (out[i] = [0, 0, 0, 0]);
+    axis[0] = ax;
+    axis[1] = az;
+    axis[2] = min;
+    axis[3] = max;
+  }
+}
+function footprintTouchesCell(axes, bx, bz) {
+  const cx2 = bx + 0.5, cz2 = bz + 0.5;
+  for (const [ax, az, min, max] of axes) {
+    const center = cx2 * ax + cz2 * az, radius = 0.5 * (Math.abs(ax) + Math.abs(az));
+    if (max < center - radius - 1e-5 || min > center + radius + 1e-5) return false;
+  }
+  return true;
+}
+function buildHull(gb, pal, design) {
   const hull = pal.hull, hull2 = pal.hull2 || shadeHex(pal.hull, 0.78);
   const NT = 14, NR = 3, TOP = NT + NR;
   const zs = [];
@@ -5600,6 +6073,22 @@ function buildHull(gb, pal) {
       tri(a, na, uvAt(i, j), b, nb, uvAt(i + 1, j), c, nc, uvAt(i, j + 1));
       tri(c, nc, uvAt(i, j + 1), b, nb, uvAt(i + 1, j), d, nd, uvAt(i + 1, j + 1));
     }
+  }
+  const strake = shadeHex(pal.hull, 0.66), levels = [0.25, 0.43, 0.61, 0.79];
+  for (const side of [-1, 1]) for (const t of levels) {
+    const point = (z, v) => {
+      const y = keelY(z) + (baseRail(z) - keelY(z)) * v;
+      return [side * (hullHalfAt1(z, y) + 0.012), y, z];
+    };
+    for (let i = 0; i < NZ; i++) {
+      const za = zs[i], zb = zs[i + 1], a = point(za, t - 8e-3), b = point(zb, t - 8e-3), c = point(za, t + 8e-3), d = point(zb, t + 8e-3);
+      gb.quad(a, b, c, d, [side, 0, 0], strake, T.hullwood, [za, 0], [zb, 0], [za, 1], [zb, 1]);
+    }
+  }
+  gb.round = 0;
+  for (const side of [-1, 1]) for (const t of [0.34, 0.7]) for (let z = -4.8; z < 5.3; z += 1.4) {
+    const y = keelY(z) + (baseRail(z) - keelY(z)) * t, x = side * (hullHalfAt1(z, y) + 0.025), r = 0.025;
+    gb.box(Math.min(x, x + side * 0.025), y - r, z - r, Math.max(x, x + side * 0.025), y + r, z + r, "#b78d52");
   }
   {
     const ys = [SHIP1.low, -0.45, -0.15, 0.2, 0.55, SHIP1.deck - 0.08], lin2 = shadeHex(pal.deck, 0.62);
@@ -5715,9 +6204,18 @@ function buildHull(gb, pal) {
   for (const sx of [-0.75, 0, 0.75]) gb.box(sx - 0.2, 1.35, SHIP1.stern + 5e-3, sx + 0.2, 1.75, SHIP1.stern + 0.06, "#f2c46a");
   gb.round = 0.05;
   gb.cyl(0, SHIP1.low, SHIP1.mastZ, 0, SHIP1.top, SHIP1.mastZ, 0.21, 0.12, pal.mast, T.log_side, 12);
-  gb.cyl(-2.7, 9.12, SHIP1.mastZ, 2.7, 9.12, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
-  gb.cyl(-2.3, 2.9, SHIP1.mastZ, 2.3, 2.9, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
+  const yard = (design.sailWidth + 0.5) / 2;
+  gb.cyl(-yard, 9.12, SHIP1.mastZ, yard, 9.12, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
+  gb.cyl(-yard * 0.85, 2.9, SHIP1.mastZ, yard * 0.85, 2.9, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
   gb.cyl(0, 1.5, SHIP1.bow + 0.4, 0, 1.75, -8.4, 0.13, 0.07, pal.mast, T.log_side, 8);
+  if (design.foremast) {
+    const fz = -5.6;
+    gb.cyl(0, 1.25, fz, 0, 7.55, fz, 0.14, 0.1, pal.mast, T.log_side, 10);
+    gb.cyl(-1.75, 7.1, fz, 1.75, 7.1, fz, 0.08, 0.08, pal.mast, T.log_side, 8);
+    gb.cyl(-1.35, 3.8, fz, 1.35, 3.8, fz, 0.07, 0.07, pal.mast, T.log_side, 8);
+    gb.cyl(0, 7.5, fz, 0, 9.2, SHIP1.mastZ, 0.035, 0.035, pal.mast, T.log_side, 6);
+    gb.cyl(0, 1.55, fz, 0, 1.75, -8.4, 0.055, 0.055, pal.mast, T.log_side, 6);
+  }
   gb.round = 0.015;
   const lz = SHIP1.mastZ + 0.24;
   for (const sx of [-0.17, 0.17]) gb.box(sx - 0.03, SHIP1.deck, lz - 0.03, sx + 0.03, SHIP1.nest, lz + 0.03, pal.rail, T.hullwood);
@@ -5946,7 +6444,9 @@ var Ship = class {
     this.kind = kind;
     this.variant = opts.variant || "normal";
     this.faction = kind === "sloop" ? "crew" : kind;
-    if (SHIP_NAMES[kind]) this.name = opts.name || SHIP_NAMES[kind][(opts.nameIx ?? Math.random() * 99 | 0) % SHIP_NAMES[kind].length];
+    this.nameIx = opts.nameIx ?? (opts.name && SHIP_NAMES[kind] ? Math.max(0, SHIP_NAMES[kind].indexOf(opts.name)) : Math.random() * 99 | 0);
+    if (SHIP_NAMES[kind]) this.name = opts.name || SHIP_NAMES[kind][this.nameIx % SHIP_NAMES[kind].length];
+    this.design = kind === "sloop" ? playerVessel(opts.playerVessel) : shipDesignFor(kind, this.nameIx, this.variant);
     this.nid = ++NID;
     this.remote = null;
     this.size = SCALE;
@@ -5961,15 +6461,17 @@ var Ship = class {
     this.sailLvl = 0;
     this.rudder = 0;
     this.reverse = false;
-    this.baseSpeed = kind === "sloop" ? 14 : kind === "merchant" ? 10 : kind === "navy" ? 12.6 : 11.4;
+    this.baseSpeed = this.design.speed;
+    this.turnMul = this.design.turn;
     this.maxSpeed = this.baseSpeed;
     this.speedMul = 1;
     this.hold = 1;
-    this.maxHp = kind === "sloop" ? 120 : kind === "merchant" ? 90 : kind === "navy" ? 150 : 110;
+    this.maxHp = this.design.hp;
     this.hp = this.maxHp;
-    this.guns = this.variant === "flagship" ? 3 : 2;
+    this.guns = this.design.guns;
     this.dmgMul = 1;
     this.reloadMul = 1;
+    this.armorMul = 1;
     this.sinking = false;
     this.sinkT = 0;
     this.cool = { port: 0, star: 0 };
@@ -6006,7 +6508,7 @@ var Ship = class {
       pal.emblem = base.emblem;
     }
     const gb = new GeoBuilder();
-    buildHull(gb, pal);
+    buildHull(gb, pal, this.design);
     this.hullHex = new THREE7.Color(pal.hull || "#6b4426").getHex();
     if (kind === "hollow") {
       for (let i = 0; i < 9; i++) {
@@ -6036,10 +6538,17 @@ var Ship = class {
     mask.renderOrder = 1;
     this.body.add(mask);
     const sailMat = new THREE7.MeshLambertMaterial({ map: sailTexture(pal.sail, pal.emblem, kind === "hollow", 3), side: THREE7.DoubleSide, transparent: kind === "hollow", alphaTest: kind === "hollow" ? 0.4 : 0 });
-    this.sail = new THREE7.Mesh(sailGeo(4.9, 4.8), sailMat);
+    this.sail = new THREE7.Mesh(sailGeo(this.design.sailWidth, this.design.sailHeight), sailMat);
     this.sail.position.set(0, 9, -0.85);
     this.sail.castShadow = true;
     this.body.add(this.sail);
+    this.foreSail = null;
+    if (this.design.foremast) {
+      this.foreSail = new THREE7.Mesh(sailGeo(3.4, 3.5), sailMat);
+      this.foreSail.position.set(0, 7.1, -5.6);
+      this.foreSail.castShadow = true;
+      this.body.add(this.foreSail);
+    }
     const jg = new THREE7.BufferGeometry();
     jg.setAttribute("position", new THREE7.Float32BufferAttribute([0, 8.6, -0.75, 0, 1.75, -8.2, 0, 1.8, -5.5], 3));
     jg.setAttribute("uv", new THREE7.Float32BufferAttribute([0.5, 1, 0, 0, 1, 0], 2));
@@ -6161,23 +6670,47 @@ var Ship = class {
     const k = this.size, lx = (dx * c - dz * s) / k, lz = (dx * s + dz * c) / k, ly = (y - this.pos.y) / k;
     return ly > -1.7 && ly < (lz > SHIP1.qdZ ? 3.2 : 2.6) && lz > SHIP1.bow - 0.4 && lz < SHIP1.stern + 0.4 && Math.abs(lx) < halfWidthAt1(lz) + 0.35;
   }
+  hullOutline(out = this.footprint || (this.footprint = HULL_FOOTPRINT.map(() => [0, 0]))) {
+    const c = Math.cos(this.heading), s = Math.sin(this.heading), k = this.size;
+    for (let i = 0; i < HULL_FOOTPRINT.length; i++) {
+      const [x, z] = HULL_FOOTPRINT[i];
+      out[i][0] = this.pos.x + (x * c + z * s) * k;
+      out[i][1] = this.pos.z + (-x * s + z * c) * k;
+    }
+    return out;
+  }
+  hullContact(other) {
+    return polygonContact(this.hullOutline(), other.hullOutline());
+  }
   windFactor(wind) {
     const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
     const dot = fx * Math.cos(wind.angle) + fz * Math.sin(wind.angle);
     return 0.45 + 0.55 * (dot + 1) / 2;
   }
   // Where the hull would touch land with its centre at (x, z) and heading h: the middle of the touching points
-  // round the outline (null when clear). Two blocks of water under the keel are enough to float.
+  // round the outline (null when clear). Each occupied terrain cell is tested against the hull footprint.
   groundContact(world, x, z, h2) {
-    const c = Math.cos(h2), s = Math.sin(h2), k = this.size;
+    const poly = this.hullOutline(), axes = this.landAxes || (this.landAxes = HULL_FOOTPRINT.map(() => [0, 0, 0, 0]));
+    const dh = wrapAngle(h2 - this.heading), ch = Math.cos(dh), sh = Math.sin(dh);
+    for (const p of poly) {
+      const lx = p[0] - this.pos.x, lz = p[1] - this.pos.z;
+      p[0] = x + lx * ch + lz * sh;
+      p[1] = z - lx * sh + lz * ch;
+    }
+    footprintAxes(poly, axes);
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const p of poly) {
+      minX = Math.min(minX, p[0]);
+      maxX = Math.max(maxX, p[0]);
+      minZ = Math.min(minZ, p[1]);
+      maxZ = Math.max(maxZ, p[1]);
+    }
     let n = 0, sx = 0, sz = 0;
-    for (const [lx0, lz0] of OUTLINE) {
-      const lx = lx0 * k, lz = lz0 * k, wx = x + lx * c + lz * s, wz = z - lx * s + lz * c;
-      const bx = Math.floor(wx), bz = Math.floor(wz);
-      if (world.solid(bx, SEA - 1, bz) || world.solid(bx, SEA, bz)) {
+    for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
+      if ((world.solid(bx, SEA - 1, bz) || world.solid(bx, SEA, bz)) && footprintTouchesCell(axes, bx, bz)) {
         n++;
-        sx += wx;
-        sz += wz;
+        sx += bx + 0.5;
+        sz += bz + 0.5;
       }
     }
     return n ? { n, x: sx / n, z: sz / n } : null;
@@ -6185,20 +6718,9 @@ var Ship = class {
   hullHits(world, x, z, h2) {
     return !!this.groundContact(world, x, z, h2);
   }
-  // the hull's collision circles in the world, [x, z, radius] each
-  hullCircles(out = this.circ || (this.circ = HULL_CIRCLES.map(() => [0, 0, 0]))) {
-    const s = Math.sin(this.heading), c = Math.cos(this.heading), k = this.size;
-    for (let i = 0; i < HULL_CIRCLES.length; i++) {
-      const [z, r] = HULL_CIRCLES[i];
-      out[i][0] = this.pos.x + z * k * s;
-      out[i][1] = this.pos.z + z * k * c;
-      out[i][2] = r * k;
-    }
-    return out;
-  }
   damage(n, G) {
     if (this.sinking) return;
-    this.hp -= n;
+    this.hp -= n * this.armorMul;
     if (this.hp <= 0) {
       this.hp = 0;
       this.sinking = true;
@@ -6283,7 +6805,7 @@ var Ship = class {
     let target = this.preview ? 0 : this.maxSpeed * this.speedMul * this.sailLvl * this.wf * stormBoost * this.hold;
     if (this.reverse) target = -1.6 * this.hold;
     this.speed += (target - this.speed) * Math.min(1, dt * (target > this.speed ? 0.38 : 0.65));
-    const turn2 = this.rudder * (0.2 + 0.5 * Math.min(1, Math.abs(this.speed) / 6)) * (this.speed < -0.1 ? -1 : 1) / Math.sqrt(this.size);
+    const turn2 = this.rudder * (0.2 + 0.5 * Math.min(1, Math.abs(this.speed) / 6)) * (this.speed < -0.1 ? -1 : 1) * this.turnMul / Math.sqrt(this.size);
     const prevH = this.heading, w = G.world;
     const turnH = this.heading - turn2 * dt;
     const step = (h2) => [this.pos.x - Math.sin(h2) * this.speed * dt, this.pos.z - Math.cos(h2) * this.speed * dt];
@@ -6356,7 +6878,7 @@ var Ship = class {
     }
     this.wf = this.windFactor(G.wind);
     if (this.kind === "hollow") this.wf = Math.max(this.wf, 0.8);
-    const turnOf = (rud, sp) => rud * (0.2 + 0.5 * Math.min(1, Math.abs(sp) / 6)) * (sp < -0.1 ? -1 : 1) / Math.sqrt(this.size);
+    const turnOf = (rud, sp) => rud * (0.2 + 0.5 * Math.min(1, Math.abs(sp) / 6)) * (sp < -0.1 ? -1 : 1) * this.turnMul / Math.sqrt(this.size);
     const prevH = this.heading;
     this.speed = r.speed;
     this.heading -= turnOf(this.rudder, this.speed) * dt;
@@ -6381,6 +6903,10 @@ var Ship = class {
   showSail(level2) {
     this.sail.scale.y = 0.1 + 0.9 * level2;
     this.sail.scale.z = (0.15 + 0.85 * this.wf) * (0.25 + 0.75 * level2);
+    if (this.foreSail) {
+      this.foreSail.scale.y = 0.1 + 0.9 * level2;
+      this.foreSail.scale.z = (0.15 + 0.85 * this.wf) * (0.25 + 0.75 * level2);
+    }
     this.jib.visible = level2 > 0.25;
   }
   applyTransform() {
@@ -9129,6 +9655,7 @@ var Fleet = class {
     this.t = 0;
     this.notoriety = 0;
     this.notT = 0;
+    this.designTally = {};
   }
   get ships() {
     return this.g.hollows.filter((s) => s.kind !== "hollow");
@@ -9169,7 +9696,13 @@ var Fleet = class {
       if (G.hollows.some((h2) => Math.hypot(h2.pos.x - x, h2.pos.z - z) < 40)) continue;
       const used = G.hollows.filter((h2) => h2.kind === kind).map((h2) => h2.name), names = SHIP_NAMES[kind] || [];
       const free = names.map((n, k) => k).filter((k) => !used.includes(names[k]));
-      const s = new Ship(G.scene, kind, { nameIx: free.length ? free[Math.random() * free.length | 0] : 0 });
+      let nameIx = 0;
+      if (free.length) {
+        const leastUsed = Math.min(...free.map((ix) => this.designTally[shipDesignFor(kind, ix).id] || 0));
+        const choices = free.filter((ix) => (this.designTally[shipDesignFor(kind, ix).id] || 0) === leastUsed);
+        nameIx = choices[Math.random() * choices.length | 0];
+      }
+      const s = new Ship(G.scene, kind, { nameIx });
       const L = Math.min(10, G.level);
       s.maxHp = s.hp = s.maxHp + L * (kind === "navy" ? 22 : 15);
       if (kind === "navy") s.dmgMul = 1.15;
@@ -9182,6 +9715,7 @@ var Fleet = class {
       }
       s.sailLvl = 0.8;
       G.hollows.push(s);
+      this.designTally[s.design.id] = (this.designTally[s.design.id] || 0) + 1;
       G.crews.man(s);
       return s;
     }
@@ -9202,7 +9736,7 @@ var Fleet = class {
     this.notoriety = Math.min(4, this.notoriety + n);
     this.notT = 0;
     if (was === 0 && this.notoriety > 0) {
-      G.ui.toast(why, "The navy has your colours now. Their cutter will hunt you until the talk dies down.", "bad");
+      G.ui.toast(why, "The navy has your colours now. Crown warships will hunt you until the talk dies down.", "bad");
       G.net.toastAll(why, "The navy is hunting this crew for a while.", "bad");
     }
   }
@@ -9309,145 +9843,196 @@ var limb = (mat, geo, x, y, z) => {
   g.add(mesh(geo, mat));
   return g;
 };
+var modelMesh = (group, builder, mat) => group.add(mesh(builder.build(), mat));
+function eyes(g, x, y, z, spacing, size2, white = 15788504, pupil = 1513237) {
+  for (const side of [-1, 1]) {
+    g.ellipsoid(side * spacing, y, z, size2, size2, size2 * 0.48, white);
+    g.ellipsoid(side * spacing, y, z - size2 * 0.36, size2 * 0.48, size2 * 0.58, size2 * 0.24, pupil);
+  }
+}
+function fin(g, a, b, c, color) {
+  const n = new THREE14.Vector3().subVectors(new THREE14.Vector3(...b), new THREE14.Vector3(...a)).cross(new THREE14.Vector3().subVectors(new THREE14.Vector3(...c), new THREE14.Vector3(...a))).normalize().toArray();
+  g.face(a, b, c, n, color).face(a, c, b, n.map((v) => -v), color);
+}
 var PARROT_COLORS = [
   { body: 14039594, wing: 2775766, tail: 15777856, name: "scarlet" },
   { body: 3844154, wing: 2783786, tail: 15777856, name: "green" },
   { body: 2779862, wing: 1723046, tail: 2779862, chest: 15777856, name: "blue" }
 ];
 function parrotModel(mat, c = PARROT_COLORS[0]) {
-  const group = new THREE14.Group();
-  const body = new GeoBuilder({ round: 0.08 }).box(-0.07, 0, -0.08, 0.07, 0.22, 0.08, c.body).box(-0.065, 0.02, -0.085, 0.065, 0.14, -0.06, c.chest || c.body).box(-0.07, 0.2, -0.1, 0.07, 0.33, 0.05, c.body).box(-0.03, 0.21, -0.17, 0.03, 0.3, -0.1, 15777856).box(-0.02, 0.2, -0.15, 0.02, 0.23, -0.1, 2763306).box(-0.072, 0.26, -0.07, -0.06, 0.29, -0.04, 1118481).box(0.06, 0.26, -0.07, 0.072, 0.29, -0.04, 1118481).box(-0.02, -0.03, -0.02, -5e-3, 0, 0.02, 5592405).box(5e-3, -0.03, -0.02, 0.02, 0, 0.02, 5592405).build();
-  group.add(mesh(body, mat));
-  const tailGeo = new GeoBuilder({ round: 0.08 }).box(-0.03, -0.2, 0, 0.03, 0.02, 0.05, c.tail).box(-0.02, -0.26, 0.01, 0.02, -0.2, 0.04, c.wing).build();
-  const tail = limb(mat, tailGeo, 0, 0.04, 0.07);
-  tail.rotation.x = 0.5;
+  const group = new THREE14.Group(), body = new GeoBuilder();
+  body.ellipsoid(0, 0.12, 0, 0.09, 0.14, 0.08, c.body).ellipsoid(0, 0.12, -0.052, 0.065, 0.105, 0.035, c.chest || c.body).ellipsoid(0, 0.29, -0.025, 0.074, 0.075, 0.07, c.body).ellipsoid(0, 0.26, -0.103, 0.036, 0.032, 0.04, c.tail).ellipsoid(0, 0.235, -0.122, 0.027, 0.018, 0.025, 2367515);
+  eyes(body, 0.048, 0.305, -0.082, 0.052, 0.018);
+  body.cyl(-0.035, -0.025, -5e-3, -0.025, 5e-3, -5e-3, 9e-3, 8e-3, 5718838, void 0, 8).cyl(0.035, -0.025, -5e-3, 0.025, 5e-3, -5e-3, 9e-3, 8e-3, 5718838, void 0, 8);
+  modelMesh(group, body, mat);
+  const tailGeo = new GeoBuilder().ellipsoid(-0.025, -0.11, 0.04, 0.018, 0.15, 0.025, c.tail).ellipsoid(0.025, -0.1, 0.045, 0.018, 0.14, 0.025, c.wing).build();
+  const tail = limb(mat, tailGeo, 0, 0.045, 0.07);
+  tail.rotation.x = 0.4;
   group.add(tail);
-  const wingGeoL = new GeoBuilder({ round: 0.08 }).box(-0.2, -0.015, -0.07, 0, 0.015, 0.09, c.wing).box(-0.24, -0.012, -0.03, -0.18, 0.012, 0.1, c.tail).build();
-  const wingGeoR = new GeoBuilder({ round: 0.08 }).box(0, -0.015, -0.07, 0.2, 0.015, 0.09, c.wing).box(0.18, -0.012, -0.03, 0.24, 0.012, 0.1, c.tail).build();
-  const wl = limb(mat, wingGeoL, -0.07, 0.16, 0);
-  const wr = limb(mat, wingGeoR, 0.07, 0.16, 0);
-  group.add(wl, wr);
-  return { group, parts: { wl, wr, tail } };
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const wing = new GeoBuilder().ellipsoid(side * 0.075, 0, 0, 0.145, 0.028, 0.075, c.wing).ellipsoid(side * 0.16, -4e-3, 0.035, 0.065, 0.022, 0.045, c.tail).ellipsoid(side * 0.12, -0.025, 0.035, 0.035, 0.055, 0.023, c.wing).build();
+    const w = limb(mat, wing, side * 0.055, 0.17, 0);
+    group.add(w);
+    wings.push(w);
+  }
+  return { group, parts: { wl: wings[0], wr: wings[1], tail } };
 }
 function crabModel(mat) {
-  const group = new THREE14.Group();
-  const g = new GeoBuilder({ round: 0.08 }).box(-0.22, 0.06, -0.15, 0.22, 0.2, 0.15, 13649962).box(-0.18, 0.2, -0.12, 0.18, 0.24, 0.12, 11549218).box(-0.09, 0.2, -0.17, -0.05, 0.32, -0.13, 2759184).box(0.05, 0.2, -0.17, 0.09, 0.32, -0.13, 2759184).box(-0.38, 0.08, -0.32, -0.22, 0.2, -0.16, 14703152).box(0.22, 0.08, -0.34, 0.4, 0.22, -0.16, 14703152);
-  for (let k = 0; k < 3; k++) {
-    g.box(-0.34, 0, -0.08 + k * 0.09, -0.22, 0.08, -0.04 + k * 0.09, 11549218);
-    g.box(0.22, 0, -0.08 + k * 0.09, 0.34, 0.08, -0.04 + k * 0.09, 11549218);
+  const group = new THREE14.Group(), g = new GeoBuilder();
+  g.ellipsoid(0, 0.14, 0, 0.27, 0.14, 0.23, 13124649).ellipsoid(0, 0.205, 0.015, 0.215, 0.075, 0.17, 14703152).ellipsoid(0, 0.075, 0.015, 0.21, 0.045, 0.17, 10303528);
+  for (const side of [-1, 1]) {
+    g.cyl(side * 0.09, 0.22, -0.13, side * 0.11, 0.34, -0.18, 0.023, 0.016, 11093036, void 0, 10).ellipsoid(side * 0.11, 0.35, -0.18, 0.033, 0.041, 0.028, 3154717).ellipsoid(side * 0.11, 0.36, -0.2, 0.012, 0.018, 0.012, 15787214);
+    const clawX = side * 0.34;
+    g.cyl(side * 0.19, 0.13, -0.11, side * 0.31, 0.15, -0.22, 0.06, 0.075, 13124649, void 0, 12).ellipsoid(clawX, 0.16, -0.25, 0.105, 0.08, 0.095, 14703152).ellipsoid(clawX, 0.11, -0.325, 0.035, 0.045, 0.05, 14703152);
+    for (let k = 0; k < 3; k++) {
+      const z = -0.07 + k * 0.095;
+      g.cyl(side * 0.19, 0.1, z, side * 0.35, 0.035, z + 0.055, 0.028, 0.018, 11811625, void 0, 9);
+    }
   }
-  group.add(mesh(g.build(), mat));
+  modelMesh(group, g, mat);
   return { group, parts: {} };
 }
 function quadruped(mat, o) {
-  const group = new THREE14.Group();
-  const body = new GeoBuilder({ round: 0.08 });
-  body.box(-o.w, o.legH, -o.l, o.w, o.legH + o.h, o.l, o.c);
-  body.box(-o.hw, o.legH + o.h * 0.15, -o.l - o.hl, o.hw, o.legH + o.h * 0.15 + o.hh, -o.l + 0.04, o.hc || o.c);
-  for (const [a, b] of o.extra || []) body.box(...a, b);
-  group.add(mesh(body.build(), mat));
-  const legGeo = new GeoBuilder({ round: 0.08 }).box(-o.lw, -o.legH, -o.lw, o.lw, 0, o.lw, o.lc).build();
+  const group = new THREE14.Group(), body = new GeoBuilder();
+  const bodyY = o.legH + o.h * 0.52, headY = o.legH + o.h * 0.69, headZ = -o.l - o.hl * 0.48;
+  body.ellipsoid(0, bodyY, 0, o.w, o.h * 0.53, o.l, o.c).ellipsoid(0, bodyY + o.h * 0.02, o.l * 0.66, o.w * 0.48, o.h * 0.34, o.l * 0.31, o.c).ellipsoid(0, headY, -o.l * 0.68, o.hw * 0.8, o.hh * 0.36, o.hl * 0.75, o.hc || o.c).ellipsoid(0, headY + o.hh * 0.1, headZ, o.hw, o.hh * 0.5, o.hl * 0.55, o.hc || o.c).ellipsoid(0, headY - o.hh * 0.24, headZ - o.hl * 0.48, o.hw * 0.75, o.hh * 0.25, o.hl * 0.25, o.muzzle || o.hc || o.c);
+  eyes(body, o.hw * 0.79, headY + o.hh * 0.11, headZ - o.hl * 0.34, o.hw * 0.8, o.eyeSize || 0.024, 15327178, 1512723);
+  for (const side of [-1, 1]) {
+    body.ellipsoid(side * o.hw * 0.78, headY + o.hh * 0.47, headZ + o.hl * 0.13, o.hw * 0.29, o.hh * 0.46, o.hl * 0.22, o.ear || o.hc || o.c);
+    if (o.kind === "boar") {
+      body.ellipsoid(side * 0.13, headY - 0.06, headZ - o.hl * 0.34, 0.035, 0.055, 0.04, 15788248);
+      body.cyl(side * 0.13, headY - 0.05, headZ - o.hl * 0.27, side * 0.18, headY + 0.02, headZ - o.hl * 0.56, 0.025, 4e-3, 15260866, void 0, 10);
+    }
+    if (o.kind === "goat") {
+      body.cyl(side * 0.09, headY + o.hh * 0.34, headZ + 0.015, side * 0.13, headY + o.hh * 0.72, headZ + 0.04, 0.052, 0.035, 9075300, void 0, 12).cyl(side * 0.13, headY + o.hh * 0.72, headZ + 0.04, side * 0.12, headY + o.hh * 0.92, headZ + 0.01, 0.035, 9e-3, 9075300, void 0, 12);
+    }
+  }
+  if (o.kind === "boar") {
+    body.ellipsoid(0, bodyY + o.h * 0.1, o.l * 0.98, 0.045, 0.05, 0.1, 3810326);
+  } else {
+    body.cyl(0, bodyY + 0.02, o.l * 0.93, 0.015, bodyY + 0.08, o.l * 1.24, 0.035, 0.012, o.c, void 0, 9);
+  }
+  modelMesh(group, body, mat);
+  const leg = new GeoBuilder().cyl(0, 0, 0, 0, -o.legH * 0.88, -0.012, o.lw * 0.75, o.lw * 0.6, o.lc, void 0, 12).ellipsoid(0, -o.legH * 0.84, -0.035, o.lw * 0.9, o.lw * 0.46, o.lw * 1.2, o.lc).build();
   const legs = [];
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const L = limb(mat, legGeo, sx * (o.w - o.lw - 0.02), o.legH, sz * (o.l - o.lw - 0.06));
+    const L = limb(mat, leg, sx * o.w * 0.7, o.legH, sz * o.l * 0.68);
     group.add(L);
     legs.push(L);
   }
   return { group, parts: { legs } };
 }
 function boarModel(mat) {
-  const hl = 0.3, l = 0.45, legH = 0.36;
   return quadruped(mat, {
+    kind: "boar",
     w: 0.27,
-    l,
+    l: 0.45,
     h: 0.44,
-    legH,
+    legH: 0.36,
     c: 5913126,
-    hw: 0.19,
-    hl,
-    hh: 0.34,
     hc: 5124639,
+    muzzle: 12618360,
+    hw: 0.19,
+    hl: 0.3,
+    hh: 0.34,
     lw: 0.07,
     lc: 3810326,
-    extra: [
-      [[-0.06, legH + 0.44, -0.4, 0.06, legH + 0.54, 0.2], 3810326],
-      [[-0.1, legH + 0.08, -l - hl - 0.12, 0.1, legH + 0.22, -l - hl + 0.02], 12618360],
-      [[-0.15, legH + 0.14, -l - hl - 0.1, -0.11, legH + 0.26, -l - hl - 0.05], 15788248],
-      [[0.11, legH + 0.14, -l - hl - 0.1, 0.15, legH + 0.26, -l - hl - 0.05], 15788248],
-      [[-0.15, legH + 0.32, -l - hl + 0.06, -0.1, legH + 0.37, -l - hl + 0.1], 1118481],
-      [[0.1, legH + 0.32, -l - hl + 0.06, 0.15, legH + 0.37, -l - hl + 0.1], 1118481],
-      [[-0.18, legH + 0.46, -l - 0.12, -0.08, legH + 0.56, -l - 0.04], 5124639],
-      [[0.08, legH + 0.46, -l - 0.12, 0.18, legH + 0.56, -l - 0.04], 5124639],
-      [[-0.02, legH + 0.2, l, 0.02, legH + 0.36, l + 0.12], 3810326]
-    ]
+    ear: 5124639,
+    eyeSize: 0.021
   });
 }
 function goatModel(mat) {
-  const hl = 0.24, l = 0.38, legH = 0.42;
   return quadruped(mat, {
+    kind: "goat",
     w: 0.21,
-    l,
+    l: 0.38,
     h: 0.4,
-    legH,
+    legH: 0.42,
     c: 15262940,
-    hw: 0.13,
-    hl,
-    hh: 0.3,
     hc: 14605010,
+    muzzle: 14209220,
+    hw: 0.13,
+    hl: 0.24,
+    hh: 0.3,
     lw: 0.055,
     lc: 12104358,
-    extra: [
-      [[-0.12, legH + 0.42, -l - 0.18, -0.07, legH + 0.62, -l - 0.06], 9075300],
-      [[0.07, legH + 0.42, -l - 0.18, 0.12, legH + 0.62, -l - 0.06], 9075300],
-      [[-0.12, legH + 0.58, -l - 0.08, -0.07, legH + 0.64, 0 - l + 0.08], 9075300],
-      [[0.07, legH + 0.58, -l - 0.08, 0.12, legH + 0.64, 0 - l + 0.08], 9075300],
-      [[-0.05, legH - 0.06, -l - hl + 0.02, 0.05, legH + 0.08, -l - hl + 0.1], 14209220],
-      [[-0.135, legH + 0.3, -l - hl + 0.05, -0.1, legH + 0.34, -l - hl + 0.09], 1118481],
-      [[0.1, legH + 0.3, -l - hl + 0.05, 0.135, legH + 0.34, -l - hl + 0.09], 1118481],
-      [[-0.03, legH + 0.3, l, 0.03, legH + 0.42, l + 0.08], 14605010]
-    ]
+    ear: 12958633,
+    eyeSize: 0.019
   });
 }
 function turtleModel(mat) {
-  const group = new THREE14.Group();
-  const g = new GeoBuilder({ round: 0.08 }).box(-0.38, 0.1, -0.42, 0.38, 0.38, 0.42, 5929530).box(-0.28, 0.38, -0.32, 0.28, 0.46, 0.32, 4876850).box(-0.3, 0.08, -0.36, 0.3, 0.12, 0.36, 14207120).box(-0.09, 0.14, -0.62, 0.09, 0.3, -0.4, 9087082).box(-0.08, 0.24, -0.6, -0.05, 0.27, -0.56, 1118481).box(0.05, 0.24, -0.6, 0.08, 0.27, -0.56, 1118481);
-  group.add(mesh(g.build(), mat));
-  const fl = new GeoBuilder({ round: 0.08 }).box(-0.12, -0.03, -0.08, 0.12, 0.03, 0.08, 8034906).build();
+  const group = new THREE14.Group(), body = new GeoBuilder();
+  body.ellipsoid(0, 0.17, 0, 0.34, 0.15, 0.39, 6718023).ellipsoid(0, 0.29, 0.02, 0.34, 0.25, 0.39, 4876850).ellipsoid(0, 0.095, 0.02, 0.28, 0.035, 0.33, 14207120).ellipsoid(0, 0.19, -0.47, 0.12, 0.11, 0.17, 9087082);
+  body.ellipsoid(0, 0.43, 0.02, 0.12, 0.075, 0.14, 5929271);
+  for (const [x, z] of [[0, 0.02], [-0.17, -0.12], [0.17, -0.12], [-0.17, 0.16], [0.17, 0.16], [0, 0.27]]) {
+    const y = 0.29 + 0.25 * Math.sqrt(Math.max(0.1, 1 - (x / 0.36) ** 2 - (z / 0.42) ** 2));
+    body.ellipsoid(x, y, z, 0.09, 0.018, 0.095, 5994552);
+  }
+  eyes(body, 0.082, 0.22, -0.59, 0.082, 0.019, 15327176, 1512723);
+  modelMesh(group, body, mat);
+  const leg = new GeoBuilder().ellipsoid(0, 0, -0.025, 0.13, 0.09, 0.16, 8034906).ellipsoid(0, -0.02, -0.11, 0.1, 0.055, 0.12, 6718023).build();
   const legs = [];
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const L = limb(mat, fl, sx * 0.4, 0.14, sz * 0.3);
+    const L = limb(mat, leg, sx * 0.3, 0.14, sz * 0.27);
     group.add(L);
     legs.push(L);
   }
   return { group, parts: { legs } };
 }
 function fishModel(mat, color) {
-  const group = new THREE14.Group();
-  const dark = new THREE14.Color(color).multiplyScalar(0.7);
-  group.add(mesh(new GeoBuilder({ round: 0.08 }).box(-0.04, -0.05, -0.13, 0.04, 0.05, 0.12, color).box(-5e-3, -0.07, 0.11, 5e-3, 0.07, 0.19, dark).build(), mat));
-  return { group, parts: {} };
+  const group = new THREE14.Group(), body = new GeoBuilder();
+  const dark = new THREE14.Color(color).multiplyScalar(0.72).getHex();
+  body.ellipsoid(0, 0, -5e-3, 0.105, 0.078, 0.19, color).ellipsoid(0, -0.024, -0.02, 0.087, 0.035, 0.15, 14862743);
+  eyes(body, 0.07, 0.022, -0.1, 0.078, 0.014, 15788247, 1512723);
+  body.cyl(0, 0.06, 0.04, 0, 0.12, -0.02, 0.032, 8e-3, dark, void 0, 10).cyl(0, -0.05, 0.03, 0, -0.1, 0, 0.025, 6e-3, dark, void 0, 10);
+  modelMesh(group, body, mat);
+  const tailGeo = new GeoBuilder().ellipsoid(0, 0, 0.07, 0.045, 0.035, 0.09, dark).ellipsoid(-0.045, 5e-3, 0.17, 0.055, 0.09, 0.025, dark).ellipsoid(0.045, 5e-3, 0.17, 0.055, 0.09, 0.025, dark).build();
+  const tail = limb(mat, tailGeo, 0, 0, 0.12);
+  group.add(tail);
+  return { group, parts: { tail } };
 }
 function dolphinModel(mat) {
-  const group = new THREE14.Group();
-  const g = new GeoBuilder({ round: 0.08 }).box(-0.26, -0.26, -0.9, 0.26, 0.26, 0.9, 8030870).box(-0.21, -0.29, -0.7, 0.21, -0.2, 0.7, 13160662).box(-0.11, -0.13, -1.25, 0.11, 0.05, -0.9, 6978182).box(-0.04, 0.26, -0.05, 0.04, 0.55, 0.3, 5925494).box(-0.45, -0.1, -0.35, -0.25, -0.05, -0.1, 5925494).box(0.25, -0.1, -0.35, 0.45, -0.05, -0.1, 5925494);
-  group.add(mesh(g.build(), mat));
-  const tail = limb(mat, new GeoBuilder({ round: 0.08 }).box(-0.42, -0.04, 0, 0.42, 0.04, 0.28, 5925494).build(), 0, 0, 0.9);
+  const group = new THREE14.Group(), body = new GeoBuilder();
+  body.ellipsoid(0, 0, -0.05, 0.28, 0.29, 0.83, 7439247).ellipsoid(0, -0.12, -0.08, 0.225, 0.15, 0.67, 13160662).ellipsoid(0, -0.025, -0.87, 0.18, 0.14, 0.34, 7439247).ellipsoid(0, -0.06, -1.12, 0.13, 0.085, 0.2, 6715780);
+  eyes(body, 0.22, 0.08, -0.78, 0.22, 0.032, 1514012, 1052946);
+  body.ellipsoid(0, 0.24, 0.04, 0.07, 0.19, 0.22, 5991801);
+  for (const side of [-1, 1]) {
+    body.ellipsoid(side * 0.35, -0.16, -0.25, 0.2, 0.035, 0.34, 5991801);
+    body.ellipsoid(side * 0.24, -0.2, -0.45, 0.15, 0.025, 0.21, 7439247);
+  }
+  modelMesh(group, body, mat);
+  const tailGeo = new GeoBuilder().cyl(0, 0, 0, 0, 0, 0.4, 0.11, 0.06, 7439247, void 0, 14).ellipsoid(-0.18, 0.025, 0.38, 0.21, 0.045, 0.17, 5991801).ellipsoid(0.18, 0.025, 0.38, 0.21, 0.045, 0.17, 5991801).build();
+  const tail = limb(mat, tailGeo, 0, 0, 0.72);
   group.add(tail);
   return { group, parts: { tail } };
 }
 function sharkModel(mat) {
-  const group = new THREE14.Group();
-  const g = new GeoBuilder({ round: 0.08 }).box(-0.3, -0.3, -1.2, 0.3, 0.3, 1.2, 5924464).box(-0.26, -0.33, -1, 0.26, -0.2, 0.9, 14738662).box(-0.25, -0.22, -1.62, 0.25, 0.18, -1.2, 5661292).box(-0.2, -0.26, -1.6, 0.2, -0.2, -1.3, 14738662).box(-0.06, 0.3, -0.25, 0.06, 0.7, 0.2, 4871776).box(-0.05, 0.7, -0.1, 0.05, 1, 0.2, 4871776).box(-0.75, -0.2, -0.6, -0.3, -0.12, -0.2, 4871776).box(0.3, -0.2, -0.6, 0.75, -0.12, -0.2, 4871776).box(-0.27, 0.02, -1.5, -0.24, 0.07, -1.45, 1118481).box(0.24, 0.02, -1.5, 0.27, 0.07, -1.45, 1118481);
-  group.add(mesh(g.build(), mat));
-  const tail = limb(mat, new GeoBuilder({ round: 0.08 }).box(-0.05, -0.55, 0, 0.05, 0.75, 0.38, 4871776).build(), 0, 0, 1.15);
+  const group = new THREE14.Group(), body = new GeoBuilder();
+  body.ellipsoid(0, 0, 0, 0.31, 0.31, 1.05, 5793907).ellipsoid(0, -0.16, -0.08, 0.275, 0.15, 0.91, 14081245).ellipsoid(0, -0.02, -0.96, 0.21, 0.18, 0.45, 5662064);
+  eyes(body, 0.23, 0.08, -0.81, 0.23, 0.031, 1513754, 1052946);
+  body.ellipsoid(0, -0.19, -1.12, 0.17, 0.018, 0.26, 2435888);
+  for (const side of [-1, 1]) {
+    for (let k = 0; k < 4; k++) body.ellipsoid(side * 0.285, 0.015 - k * 0.055, -0.35 + k * 0.065, 0.012, 0.04, 0.018, 4082259);
+    body.ellipsoid(side * 0.49, -0.17, -0.32, 0.27, 0.04, 0.37, 5135976);
+    body.ellipsoid(side * 0.28, -0.2, 0.55, 0.16, 0.025, 0.27, 5135976);
+  }
+  fin(body, [0, 0.22, -0.3], [0, 0.66, 0.08], [0, 0.22, 0.35], 4938083);
+  fin(body, [0, -0.18, 0.25], [0, 0.14, 0.62], [0, -0.18, 0.78], 4938083);
+  modelMesh(group, body, mat);
+  const tailGeo = new GeoBuilder().cyl(0, 0, 0, 0, 0, 0.35, 0.11, 0.055, 5661549, void 0, 12).ellipsoid(0, 0.34, 0.25, 0.055, 0.42, 0.22, 4938083).ellipsoid(0, -0.28, 0.29, 0.055, 0.34, 0.2, 4938083).build();
+  const tail = limb(mat, tailGeo, 0, 0, 1);
   group.add(tail);
   return { group, parts: { tail } };
 }
 function whaleModel(mat) {
-  const group = new THREE14.Group();
-  const g = new GeoBuilder({ round: 0.08 }).box(-1.6, -1.4, -5, 1.6, 1.2, 4.6, 3820122).box(-1.3, -1.5, -4.6, 1.3, -1.2, 2.5, 10135214).box(-1.4, -1, -6.2, 1.4, 0.9, -5, 3424847).box(-0.2, 1.2, 1.5, 0.2, 1.6, 2.4, 3424847).box(-2.6, -0.9, -2.2, -1.6, -0.7, -0.6, 3424847).box(1.6, -0.9, -2.2, 2.6, -0.7, -0.6, 3424847).box(-1.42, 0.1, -5.4, -1.36, 0.3, -5.2, 1118481).box(1.36, 0.1, -5.4, 1.42, 0.3, -5.2, 1118481);
-  group.add(mesh(g.build(), mat));
-  const tail = limb(mat, new GeoBuilder({ round: 0.08 }).box(-0.6, -0.6, 0, 0.6, 0.5, 2.2, 3820122).box(-2.6, -0.15, 1.6, 2.6, 0.15, 3, 3424847).build(), 0, 0, 4.4);
+  const group = new THREE14.Group(), body = new GeoBuilder();
+  body.ellipsoid(0, -0.05, -0.2, 1.55, 1.23, 4.65, 4018272).ellipsoid(0, -0.58, -0.22, 1.32, 0.62, 3.78, 10135214).ellipsoid(0, 0.43, -3.72, 1.18, 0.77, 1.27, 3688789).ellipsoid(0, 1.12, 0.95, 0.25, 0.2, 0.48, 3424847).ellipsoid(0, 1.18, -3.98, 0.09, 0.035, 0.16, 2438204);
+  eyes(body, 1.12, 0.28, -4.48, 1.12, 0.085, 1514012, 1052946);
+  body.ellipsoid(-1.28, -0.48, -0.85, 0.76, 0.12, 1.05, 3424847).ellipsoid(1.28, -0.48, -0.85, 0.76, 0.12, 1.05, 3424847);
+  modelMesh(group, body, mat);
+  const tailGeo = new GeoBuilder().cyl(0, 0, 0, 0, 0, 1.35, 0.42, 0.23, 4018272, void 0, 16).ellipsoid(-0.48, 0.02, 1.2, 0.58, 0.1, 0.72, 3424847).ellipsoid(0.48, 0.02, 1.2, 0.58, 0.1, 0.72, 3424847).build();
+  const tail = limb(mat, tailGeo, 0, -0.05, 4.05);
   group.add(tail);
   return { group, parts: { tail } };
 }
@@ -10455,13 +11040,23 @@ function humanHeadwear(L, head) {
   const irisMaterial = new THREE16.MeshStandardMaterial({ color: "#563a25", roughness: 0.42 });
   const pupilMaterial = new THREE16.MeshStandardMaterial({ color: "#171311", roughness: 0.28 });
   const glintMaterial = new THREE16.MeshBasicMaterial({ color: "#eee8dc" });
+  const skinMaterial = new THREE16.MeshStandardMaterial({ color: L.skin, roughness: 0.82, map: SKIN_MAP });
+  const eyelids = [];
   for (const side of [-1, 1]) {
     const sclera = addMesh(head, new THREE16.SphereGeometry(1, 24, 16), scleraMaterial, [side * 0.036, 0.054, 0.079], [85e-4, 6e-3, 2e-3]);
     const iris = addMesh(head, new THREE16.SphereGeometry(1, 20, 14), irisMaterial, [side * 0.036, 0.054, 0.0808], [52e-4, 62e-4, 18e-4]);
     const pupil = addMesh(head, new THREE16.SphereGeometry(1, 16, 12), pupilMaterial, [side * 0.036, 0.054, 0.0823], [22e-4, 34e-4, 1e-3]);
     const glint = addMesh(head, new THREE16.SphereGeometry(1, 10, 8), glintMaterial, [side * 0.036 - 12e-4, 0.056, 0.0831], [7e-4, 7e-4, 4e-4]);
-    for (const eye of [sclera, iris, pupil, glint]) eye.castShadow = false;
+    const brow = addMesh(head, new THREE16.SphereGeometry(1, 16, 10), hairMaterial, [side * 0.036, 0.063, 0.078], [0.01, 22e-4, 22e-4]);
+    brow.rotation.z = side * -0.08;
+    const lid = addMesh(head, new THREE16.SphereGeometry(1, 20, 12), skinMaterial, [side * 0.036, 0.054, 0.084], [8e-3, 2e-4, 24e-4]);
+    lid.userData.openScale = lid.scale.y;
+    lid.userData.closedScale = 64e-4;
+    eyelids.push(lid);
+    for (const eye of [sclera, iris, pupil, glint, brow, lid]) eye.castShadow = false;
   }
+  addMesh(head, new THREE16.SphereGeometry(1, 20, 14), skinMaterial, [0, 0.035, 0.083], [65e-4, 0.014, 7e-3]);
+  addMesh(head, new THREE16.SphereGeometry(1, 20, 14), skinMaterial, [0, 0.025, 0.088], [9e-3, 7e-3, 8e-3]);
   if (L.patch) {
     const patchMaterial = new THREE16.MeshStandardMaterial({ color: "#181715", roughness: 0.95 });
     addMesh(head, new THREE16.SphereGeometry(1, 24, 16), patchMaterial, [0.035, -5e-3, 0.09], [0.04, 0.033, 0.018]);
@@ -10494,6 +11089,7 @@ function humanHeadwear(L, head) {
     brim.userData.sharedHumanModel = false;
     crown.userData.sharedHumanModel = false;
   }
+  return eyelids;
 }
 var Avatar = class {
   constructor(look, extra = {}) {
@@ -10501,6 +11097,7 @@ var Avatar = class {
     this.root = new THREE16.Group();
     this.mat = voxelMaterial();
     this.t = Math.random() * 10;
+    this.blinkOffset = Math.random() * 4.5;
     this.phase = 0;
     this.swing = 0;
     this.item = null;
@@ -10520,6 +11117,7 @@ var Avatar = class {
     this.root.clear();
     this.humanRig = null;
     this.humanBones = null;
+    this.humanFace = null;
     if (HUMAN_SOURCE) {
       this.buildHuman(L);
       return;
@@ -10594,7 +11192,7 @@ var Avatar = class {
     this.humanRig.add(gear);
     this.humanRig.updateMatrixWorld(true);
     this.humanBones.pelvis.attach(gear);
-    humanHeadwear(L, this.humanBones.head);
+    this.humanFace = humanHeadwear(L, this.humanBones.head);
     this.hand = new THREE16.Group();
     this.hand.rotation.x = Math.PI / 2;
     this.humanBones.hand_r.add(this.hand);
@@ -10658,10 +11256,14 @@ var Avatar = class {
     set("upperarm_r", armR, 0, 0.65 + armRz);
     set("lowerarm_l", elbowL);
     set("lowerarm_r", elbowR);
-    set("spine_01", -torsoX * 0.25, torsoY * 0.25, torsoZ * 0.25);
-    set("spine_02", -torsoX * 0.35, torsoY * 0.35, torsoZ * 0.35);
+    const breathing = state === "idle" || state === "helm" ? Math.sin(this.t * 1.6) * 0.012 : 0;
+    set("spine_01", -torsoX * 0.25 - breathing, torsoY * 0.25, torsoZ * 0.25);
+    set("spine_02", -torsoX * 0.35 - breathing * 0.6, torsoY * 0.35, torsoZ * 0.35);
     set("spine_03", -torsoX * 0.3, torsoY * 0.3, torsoZ * 0.3);
-    set("head", headX + (o.look || 0), headY, 0);
+    set("head", headX + (o.look || 0), headY + (state === "idle" ? Math.sin(this.t * 0.55) * 0.012 : 0), 0);
+    const blinkPhase = (this.t + this.blinkOffset) % 4.5;
+    const blink = state !== "dead" && blinkPhase < 0.14 ? Math.sin(Math.PI * blinkPhase / 0.14) : 0;
+    for (const lid of this.humanFace || []) lid.scale.y = lid.userData.openScale + (lid.userData.closedScale - lid.userData.openScale) * blink;
     if (this.petGroup) {
       const busy = state === "run" || state === "air" || o.swing > 0;
       this.petGroup.position.y = 1.4 + (busy ? 0.06 + Math.abs(Math.sin(this.t * 22)) * 0.05 : Math.max(0, Math.sin(this.t * 2.3)) * 0.012);
@@ -11215,7 +11817,7 @@ var Crews = class {
     const G = this.g;
     if ((ship.kind === "merchant" || ship.kind === "navy") && !ship.reported) {
       ship.reported = true;
-      G.fleet.raise(ship.kind === "navy" ? 2 : 1, ship.kind === "navy" ? "You boarded a navy cutter" : "You boarded a merchantman");
+      G.fleet.raise(ship.kind === "navy" ? 2 : 1, ship.kind === "navy" ? "You boarded a navy ship" : "You boarded a merchantman");
     }
     ship.angryT = Math.max(ship.angryT || 0, 80);
     if (!ship.boardedOnce) {
@@ -11909,6 +12511,13 @@ var Input = class {
     if (on) this.gamepadHeld.add(a);
     else this.gamepadHeld.delete(a);
   }
+  promptControl(action) {
+    if (this.gamepadId !== null) {
+      return { use: "□", jump: "×", crouch: "○", view: "△", attack: "R2", place: "L2", menu: "Options" }[action] || "×";
+    }
+    if (this.g.isTouch) return "Tap";
+    return { use: "F", jump: "Space", crouch: "C", view: "V", attack: "Left click", place: "Right click", menu: "P" }[action] || "F";
+  }
   deadzone(value, zone = 0.16) {
     const magnitude = Math.abs(value);
     if (magnitude <= zone) return 0;
@@ -12006,14 +12615,24 @@ var Input = class {
       this.gamepadToastPending = false;
     }
     if (play) {
+      const step = this.g.hints && this.g.hints.tutorialStep;
+      const guide = Number.isInteger(step) && step >= 0 && step < 6;
       if (justPressed(1)) this.press("crouch");
       if (justPressed(2)) this.press("use");
       if (justPressed(3)) this.press("view");
       if (justPressed(4) || justPressed(14)) this.press("prev");
-      if (justPressed(5) || justPressed(15)) this.press("next");
-      if (justPressed(6)) this.press("place");
+      if (justPressed(5)) this.press("next");
+      if (justPressed(15)) {
+        if (guide) this.g.advanceTutorial();
+        else this.press("next");
+      }
+      if (justPressed(6)) this.press(this.g.player && this.g.player.mode === "helm" ? "port" : "place");
+      if (justPressed(7) && this.g.player && this.g.player.mode === "helm") this.press("star");
       if (justPressed(8) || justPressed(12)) this.press("map");
-      if (justPressed(13)) this.press("quests");
+      if (justPressed(13)) {
+        if (guide) this.g.skipTutorial();
+        else this.press("quests");
+      }
       if (justPressed(9)) this.press("menu");
       if (justPressed(11)) this.press("emote");
       this.lookDX += rx * 1200 * dt;
@@ -12223,6 +12842,8 @@ var UI = class {
     tap("bBag", () => G.openSheet("bag"));
     tap("bMenu", () => G.openSheet("menu"));
     tap("tView", () => G.toggleView());
+    tap("guideNext", () => G.advanceTutorial());
+    tap("guideSkip", () => G.skipTutorial());
     const hold = (id, action) => {
       const el = $(id);
       el.addEventListener("pointerdown", (e) => {
@@ -12380,6 +13001,7 @@ var UI = class {
       const deg = Math.atan2(wx * hc - wz * hs, -(wx * hs + wz * hc)) * 180 / Math.PI;
       this.css("wind", $("sWind"), "transform", `rotate(${deg.toFixed(0)}deg)`);
       this.txt("windT", $("sWindTxt"), s.wf > 0.85 ? "Fair" : s.wf > 0.6 ? "Beam" : "Head");
+      this.txt("shipKeys", $("shipKeys"), G.input.gamepadId !== null ? "Left stick: sails/steer · L2/R2: fire · □: leave helm" : "W/S sails · A/D steer · Q/E fire · R repair · F leave helm");
       this.hidden("shipKeys", $("shipKeys"), P.mode !== "helm" || G.isTouch);
     }
     let ename = null, efrac = 0;
@@ -12399,7 +13021,7 @@ var UI = class {
         if (d < 90 && (!best || d < best.d)) best = { h: h2, d };
       }
       if (best) {
-        ename = best.h.kind !== "hollow" ? best.h.name : best.h.variant === "flagship" ? "The Hollow Flagship" : "The Hollow Wake";
+        ename = best.h.kind !== "hollow" ? `${best.h.design.label} · ${best.h.name}` : best.h.variant === "flagship" ? "The Hollow Flagship" : "The Hollow Wake";
         efrac = best.h.hp / best.h.maxHp;
       }
     }
@@ -12472,9 +13094,10 @@ var UI = class {
     this.txt("goalD", $("goalDist"), mk ? `${Math.round(Math.hypot(mk.x - P.pos.x, mk.z - P.pos.z))} m` : "");
     const it = G.interaction;
     const promptText = G.needsClick ? "Click the game to look around" : it && P.mode !== "helm" ? it.label : "";
-    this.hidden("prompt", $("prompt"), !promptText || G.isTouch);
-    if (promptText && !G.isTouch) {
-      const key = G.needsClick ? "" : "F";
+    const usingGamepad = G.input.gamepadId !== null;
+    this.hidden("prompt", $("prompt"), !promptText || G.isTouch && !usingGamepad);
+    if (promptText && (!G.isTouch || usingGamepad)) {
+      const key = G.needsClick ? "" : G.input.promptControl("use");
       if (this.cache.prompt !== key + promptText) {
         this.cache.prompt = key + promptText;
         const el = $("prompt");
@@ -12490,7 +13113,7 @@ var UI = class {
     if (G.isTouch) {
       const helm = P.mode === "helm";
       this.hidden("tUse", $("tUse"), !it);
-      if (it) this.txt("tUseT", $("tUse"), it.short || it.label);
+      if (it) this.txt("tUseT", $("tUse"), `${usingGamepad ? G.input.promptControl("use") : "Tap"} ${it.short || it.label}`);
       this.hidden("tPort", $("tPort"), !helm);
       this.hidden("tStar", $("tStar"), !helm);
       this.hidden("tHit", $("tHit"), helm);
@@ -12504,6 +13127,27 @@ var UI = class {
       const item = G.hotbar[G.sel], food = item && ITEMS[item].food;
       this.txt("tPlaceT", $("tPlace"), food ? item === "grog" ? "Drink" : "Eat" : "Place");
       this.txt("tViewT", $("tView"), G.camMode === "third" ? "1st" : "3rd");
+    }
+    const step = G.hints.tutorialStep;
+    const guideOn = G.state === "play" && P.alive && Number.isInteger(step) && step >= 0 && step < 6;
+    this.hidden("guide", $("guide"), !guideOn);
+    if (guideOn) {
+      const use = G.input.promptControl("use"), attack = G.input.promptControl("attack");
+      const controls = G.input.gamepadId !== null ? { use: `${use} Use`, attack } : G.isTouch ? { use: "Tap Use", attack: "Hit" } : { use: `${use} Use`, attack: "Left click" };
+      const guide = [
+        ["Movement & looking", G.input.gamepadId !== null ? "Use the left stick to move and the right stick to look around." : G.isTouch ? "Move with the left joystick; drag the right side to look around." : "Move with W, A, S, D; move the mouse to look around."],
+        ["Gather & interact", `Choose a tool on the hotbar. ${controls.attack} to swing; ${controls.use} to talk, board, or use what your prompt names.`],
+        ["Set sail", `Walk up the pier and ${controls.use} at your sloop’s wheel. At the helm, move forward/back to trim sail and left/right to steer.`],
+        ["Fight at sea", `At a cannon, look to aim and ${controls.attack} to fire. From the helm, use the port and starboard fire controls; watch your shot supply.`],
+        ["Keep your voyage", "Open Menu, choose Save, then save to a numbered slot. Your autosave also updates as you play."],
+        ["The sea is yours", "Follow the compass and your chosen quest, gather what you need, and return to Brine Haven when you’re ready."]
+      ];
+      const [title, body] = guide[step];
+      this.txt("guideStep", $("guideStep"), `FIRST VOYAGE · ${step + 1} OF 6`);
+      this.txt("guideTitle", $("guideTitle"), title);
+      this.txt("guideText", $("guideText"), body);
+      this.txt("guideNextText", $("guideNext"), step === 5 ? "Finish" : "Next");
+      this.txt("guideControls", $("guideControls"), G.input.gamepadId !== null ? "D-pad → next · D-pad ↓ skip" : G.isTouch ? "Tap Next to continue" : "Continue with Next");
     }
     $("bQuests").classList.toggle("alert", G.quests.active.some((q) => q.state === "ready"));
   }
@@ -12882,15 +13526,35 @@ var UI = class {
 
 // src/shop.js
 var UPGRADES = [
-  { id: "hull1", name: "Oak-ribbed hull", desc: "Hull strength rises from 120 to 160.", price: 250 },
-  { id: "hull2", name: "Iron-banded hull", desc: "Hull strength rises from 160 to 210.", price: 600, req: "hull1" },
-  { id: "sails1", name: "Fresh canvas", desc: "Your sloop sails 12% faster.", price: 220 },
-  { id: "sails2", name: "Silk-weave sails", desc: "Another 13% on top of fresh canvas.", price: 550, req: "sails1" },
-  { id: "guns", name: "Third cannon", desc: "Every broadside fires three balls instead of two.", price: 450 },
+  { id: "hull1", name: "Oak-ribbed hull", desc: "Adds 40 hull strength to every boat you sail.", price: 250 },
+  { id: "hull2", name: "Iron-banded hull", desc: "Adds 50 more hull strength to every boat you sail.", price: 600, req: "hull1" },
+  { id: "sails1", name: "Fresh canvas", desc: "Every boat you sail moves 12% faster.", price: 220 },
+  { id: "sails2", name: "Silk-weave sails", desc: "Another 13% speed for every boat you sail.", price: 550, req: "sails1" },
+  { id: "guns", name: "Third cannon", desc: "Raises your broadside to three guns where the hull allows.", price: 450, reqVessel: "cutter" },
   { id: "reload", name: "Drilled gun crew", desc: "Your cannons reload 25% faster.", price: 300 },
+  { id: "rudder", name: "Balanced rudder", desc: "Every boat you sail turns 15% tighter.", price: 500, reqVessel: "cutter" },
+  { id: "keel", name: "Copper-sheathed keel", desc: "Your hull takes 15% less damage.", price: 800, reqVessel: "brigantine" },
   { id: "coat", name: "Sea-wolf coat", desc: "Your health rises from 100 to 130.", price: 280 },
   { id: "pick", name: "Steel pickaxe", desc: "Mine stone and brick 60% faster.", price: 160 }
 ];
+var VESSELS = [
+  { id: "cutter", name: "Cutter", price: 700, requires: "sloop", paths: { story: 2, contracts: 3, islands: 8, ships: 2 }, desc: "A quick, nimble hull for scouting and running down raiders." },
+  { id: "brigantine", name: "Brigantine", price: 1800, requires: "cutter", paths: { story: 4, contracts: 8, islands: 20, ships: 6 }, desc: "A two-masted, well-armed ship built for long crossings." },
+  { id: "frigate", name: "Frigate", price: 4200, requires: "brigantine", paths: { story: 7, contracts: 15, islands: 34, ships: 12 }, desc: "A stout warship with a heavy broadside and a deep keel." }
+];
+function vesselProgress(G, vessel) {
+  const q = G.quests, paths = vessel.paths;
+  const values = [
+    ["Story", q.step, paths.story],
+    ["Contracts", q.stats.contracts || 0, paths.contracts],
+    ["Islands charted", q.discovered.length, paths.islands],
+    ["Ships sunk", G.stats.ships || 0, paths.ships]
+  ];
+  return {
+    unlocked: values.some(([, value, need]) => value >= need),
+    text: values.map(([label, value, need]) => `${label} ${Math.min(value, need)}/${need}`).join(" · ")
+  };
+}
 var SUPPLIES = [
   { item: "ball", n: 10, price: 40 },
   { item: "shot", n: 20, price: 30 },
@@ -13114,8 +13778,8 @@ var Sheets = class {
   // your sea chest aboard the sloop: stow things, take them back
   r_chest() {
     const G = this.g;
-    this.paper.append(this.head("Aboard your sloop", "Sea chest"));
-    this.paper.append(h("p", { class: "muted", text: "Stow gold and loot you don’t want to lose. What you carry sinks with you when you die; what’s in the chest is safe unless the sloop goes down. Sell loot to Old Mags." }));
+    this.paper.append(this.head("Aboard your ship", "Sea chest"));
+    this.paper.append(h("p", { class: "muted", text: "Stow gold and loot you don’t want to lose. What you carry sinks with you when you die; what’s in the chest is safe unless your ship goes down. Sell loot to Old Mags." }));
     const gold = h("div", { class: "chestList" });
     gold.append(h(
       "div",
@@ -13197,7 +13861,7 @@ var Sheets = class {
     }
     this.paper.append(keys.length ? grid : h("p", { class: "muted", text: "Your bag is empty." }));
     const lv = G.lootValue(G.inv);
-    if (lv) this.paper.append(h("p", { class: "muted", text: `You carry loot worth ${lv} gold. Sell it to Old Mags at Brine Haven, or stow it in the sea chest in your sloop’s hold so a death doesn’t cost you it.` }));
+    if (lv) this.paper.append(h("p", { class: "muted", text: `You carry loot worth ${lv} gold. Sell it to Old Mags at Brine Haven, or stow it in your ship’s hold so a death doesn’t cost you it.` }));
     this.paper.append(h("div", { class: "row" }, this.btn("Empty this slot", () => {
       G.hotbar[slot] = null;
       G.ui.buildHotbar();
@@ -13252,6 +13916,20 @@ var Sheets = class {
       Q.tracked = "story";
       this.render();
     }, "btn small ghost")] }));
+    if (Q.step >= 1 || Q.flags.shipwrightIntro) {
+      const yard = Q.shipyardObjective();
+      this.paper.append(this.card({
+        title: yard.title,
+        text: yard.text,
+        meta: "Side story · shipyard",
+        story: true,
+        tracked: tr.id === "shipwright",
+        actions: [Q.flags.shipwrightIntro && tr.id !== "shipwright" ? this.btn("Track", () => {
+          Q.tracked = "shipwright";
+          this.render();
+        }, "btn small ghost") : null]
+      }));
+    }
     this.paper.append(h("p", { class: "muted", text: "Choose Track to set an objective on your compass. New contracts are offered by Old Mags at Brine Haven and Brother Tallow at the lighthouse." }));
     if (!Q.active.length) this.paper.append(h("p", { class: "muted", text: "No contracts yet. Old Mags at Brine Haven posts new work every day, and Brother Tallow does too once the lighthouse burns again." }));
     for (const q of Q.active) {
@@ -13298,6 +13976,11 @@ var Sheets = class {
       d.story.act();
       if (this.name === nm) this.render();
     })] }));
+    if (d.shipwright) this.paper.append(this.card({ title: "The Shipwright’s Wager", text: d.shipwright.text, story: true, actions: [this.btn(d.shipwright.button, () => {
+      const nm = this.name;
+      d.shipwright.act();
+      if (this.name === nm) this.render();
+    })] }));
     for (const q of d.ready) {
       this.paper.append(this.card({ title: q.title, text: q.kind === "delivery" ? "Hand over the cargo." : "The job is done. Collect your pay.", meta: `Reward: ${q.reward} gold`, actions: [this.btn("Hand in", () => {
         Q.turnIn(q.id, id);
@@ -13331,11 +14014,34 @@ var Sheets = class {
   r_shop() {
     const G = this.g;
     this.paper.append(this.head(`${G.banked} gold banked`, "Trading post"));
-    this.paper.append(h("p", { class: "muted", text: "Old Mags only takes banked gold. Upgrades last the whole voyage, even if your sloop sinks." }));
+    this.paper.append(h("p", { class: "muted", text: G.net.inCrew ? "Old Mags only takes banked gold. Shipyard refits wait until you are back on your own voyage." : `Old Mags only takes banked gold. Your ${G.sloop.design.label} is in service; upgrades carry across every hull. Step ashore to commission or switch boats.` }));
+    this.paper.append(h("h3", { text: "Shipyard" }));
+    const hulls = [{ id: "sloop", name: "Sloop", price: 0, starter: true, desc: "Your original, balanced all-rounder." }, ...VESSELS];
+    for (const vessel of hulls) {
+      const owned = !!G.ownedShips[vessel.id], active = G.shipType === vessel.id;
+      const progress = vessel.starter ? null : vesselProgress(G, vessel);
+      const previous = vessel.requires === "sloop" || vessel.requires && G.ownedShips[vessel.requires];
+      const charter = vessel.starter || G.quests.flags.shipwrightIntro && previous && progress.unlocked;
+      const canRefit = G.player.mode === "foot" && !G.player.ship && !G.net.inCrew;
+      const nextName = vessel.requires && VESSELS.find((v) => v.id === vessel.requires)?.name;
+      const state = active ? "In service." : owned ? "Owned; available at the pier." : !G.quests.flags.shipwrightIntro ? "Ask Old Mags about the Shipwright’s Wager." : !previous ? `Commission the ${nextName} first.` : `${progress.text}. Any one route earns its charter.`;
+      this.paper.append(h(
+        "div",
+        { class: "shopitem" + (owned ? " owned" : "") },
+        h("div", {}, h("div", { class: "rname", text: vessel.name }), h("div", { class: "rnote", text: `${vessel.desc} ${state}` })),
+        this.btn(active ? "In service" : owned ? "Select" : `Commission · ${vessel.price}`, () => {
+          const changed = owned ? G.selectVessel(vessel.id) : G.buyVessel(vessel.id);
+          if (changed) this.render();
+        }, "btn small", active || !canRefit || !owned && (!charter || G.banked < vessel.price))
+      ));
+    }
+    this.paper.append(h("p", { class: "muted", text: "Charter routes are tracked in your quest log. Switching hulls recalls your current boat to the Brine Haven pier and preserves its hull condition." }));
     this.paper.append(h("h3", { text: "Upgrades" }));
     for (const u of UPGRADES) {
-      const owned = !!G.upgrades[u.id], locked = u.req && !G.upgrades[u.req];
-      const note = locked ? `${u.desc} Needs ${UPGRADES.find((x) => x.id === u.req).name.toLowerCase()} first.` : u.desc;
+      const owned = !!G.upgrades[u.id], locked = !owned && (u.req && !G.upgrades[u.req] || u.reqVessel && !G.ownedShips[u.reqVessel]);
+      const needUpgrade = !owned && u.req && !G.upgrades[u.req] ? `Needs ${UPGRADES.find((x) => x.id === u.req).name.toLowerCase()} first.` : "";
+      const needVessel = !owned && u.reqVessel && !G.ownedShips[u.reqVessel] ? `Needs a ${VESSELS.find((v) => v.id === u.reqVessel).name} charter first.` : "";
+      const note = [u.desc, needUpgrade, needVessel].filter(Boolean).join(" ");
       this.paper.append(h(
         "div",
         { class: "shopitem" + (owned ? " owned" : "") },
@@ -13372,6 +14078,7 @@ var Sheets = class {
       G.net.available || G.net.role ? this.btn(G.net.role === "host" ? `Crew · ${G.net.crew.size}` : G.net.inCrew ? "Crew · aboard" : "Crew", () => G.openSheet("crew"), "btn ghost") : null,
       this.btn("Settings", () => G.openSheet("settings", {}), "btn ghost"),
       this.btn("How to play", () => G.openSheet("help", {}), "btn ghost"),
+      this.btn("Replay voyage guide", () => G.replayTutorial(), "btn ghost"),
       G.player.alive ? this.btn("I’m stuck", () => G.startStuck(), "btn ghost") : null
     ));
     this.paper.append(h(
@@ -13429,7 +14136,7 @@ var Sheets = class {
       for (const m of N2.roster()) this.paper.append(h("div", { class: "crewrow" + (m.host ? " me" : "") }, h("div", {}, h("div", { class: "cn", text: (m.host ? "⚓ " : "") + m.name }), h("div", { class: "cm", text: `${m.host ? "Captain" : "Crew"} · ${!m.alive ? "down" : m.aboard ? "on deck" : "ashore"}` }))));
       this.paper.append(h("div", { class: "row" }, this.confirmBtn("Leave the crew", () => {
         G.closeSheet();
-        N2.leave("You rowed back to your own sloop.");
+        N2.leave("You rowed back to your own voyage.");
       }, "btn small ghost")));
     } else {
       const inGame = G.state === "play" || G.state === "sheet";
@@ -13568,11 +14275,11 @@ var Sheets = class {
     if (G.isTouch) {
       this.paper.append(h("h3", { text: "Touch" }), table(touch));
     }
-    this.paper.append(h("h3", { text: "On foot" }), table(desk), h("h3", { text: "Aboard your sloop" }), table(aboard), h("h3", { text: "At the helm" }), table(helm));
+    this.paper.append(h("h3", { text: "On foot" }), table(desk), h("h3", { text: "Aboard your ship" }), table(aboard), h("h3", { text: "At the helm" }), table(helm));
     this.paper.append(h("h3", { text: "Building and breaking" }), h("p", { class: "muted", text: "Hold the builder’s hammer to put down floors, walls, windows, doorways, stairs, roofs and posts. Walls snap to the edge of the floor you aim at; stairs and roofs climb away from you. Wood costs planks, stone costs bricks. Cut a tree at the trunk and it comes down whole. Knock out what holds something up and it falls. Powder kegs (Craft) go off a few seconds after you hit them." }));
     this.paper.append(h("h3", { text: "Guns" }), h("p", { class: "muted", text: "Pick a gun on your hotbar and click to fire: one ball, then a reload (the ring round the crosshair). The pistol is quick, the blunderbuss sprays shot up close, and the long musket hits far: hold right click (Place on touch) to aim down the barrel. Guns use lead shot: melt a cannonball into ten at the craft bench. A shot sets off a powder keg." }));
     this.paper.append(h("h3", { text: "Boarding other ships" }), h("p", { class: "muted", text: "Swim to any ship, or swing over on the grappling hook, and climb aboard. Her crew will fight: cut down the helmsman and she loses way, and mind the lookout’s musket up in the crow’s nest. Beat them all and break open the strongbox in her hold. Boarding a merchantman or the navy puts the navy on your trail." }));
-    this.paper.append(h("h3", { text: "Loot" }), h("p", { class: "muted", text: "Gold and valuables you carry (goblets, pearls, rubies, idols) are lost if you die. Stow them in the sea chest in your sloop’s hold, where they’re safe unless she sinks, and sell them to Old Mags when you bank. Hollowmen rise at night away from lantern light, and the Hollow Wake hunts anyone carrying cursed gold." }));
+    this.paper.append(h("h3", { text: "Loot" }), h("p", { class: "muted", text: "Gold and valuables you carry (goblets, pearls, rubies, idols) are lost if you die. Stow them in your ship’s hold, where they’re safe unless she sinks, and sell them to Old Mags when you bank. Hollowmen rise at night away from lantern light, and the Hollow Wake hunts anyone carrying cursed gold." }));
     this.paper.append(h("h3", { text: "Stuck?" }), h("p", { class: "muted", text: "Menu, I’m stuck, then stand still for seven seconds and you’re lifted out to open air." }));
     this.paper.append(h("h3", { text: "Music" }), h("p", { class: "muted", text: "The band follows your voyage: a shanty at the title, a jig under sail, a hornpipe ashore, a waltz after dark and a reel when a fight starts. Turn it off, or the volume down, in Settings." }));
     this.paper.append(h("h3", { text: "Sailing with friends" }), h("p", { class: "muted", text: "Open your voyage from Crew in the menu, and friends who have this page open can join your ship. One pirate steers at a time; whoever holds the wheel fires the broadsides with their own shot. Everyone keeps their own gold, gear and look, and takes them home when they leave." }));
@@ -13604,6 +14311,12 @@ var Sheets = class {
       form.append(this.optRow("Hat", LOOKS.hat.map((b, i) => [i, b]), L.hat, (i) => upd("hat", i)));
       form.append(this.swatches("Coat", LOOKS.coat.map((c) => c.c), L.coat, (i) => upd("coat", i), LOOKS.coat.map((c) => c.name)));
       form.append(this.optRow("Eyes", [[false, "Both eyes"], [true, "Eye patch"]], !!L.patch, (v) => upd("patch", v)));
+      if (fresh) {
+        if (this.opts.showGuide == null) this.opts.showGuide = true;
+        form.append(this.check("Show the optional first-voyage guide", this.opts.showGuide, (v) => {
+          this.opts.showGuide = v;
+        }));
+      }
     } else {
       form.append(this.textField("Ship name", L.ship, 26, (v) => {
         L.ship = v || "The Salt Wren";
@@ -13623,7 +14336,7 @@ var Sheets = class {
       this.render();
     }, "btn ghost"));
     if (fresh) {
-      row.append(this.btn("Back", () => G.closeSheet(), "btn ghost"), this.btn("Set sail", () => G.beginVoyage(L)));
+      row.append(this.btn("Back", () => G.closeSheet(), "btn ghost"), this.btn("Set sail", () => G.beginVoyage(L, this.opts.showGuide)));
     } else row.append(this.btn("Done", () => {
       G.autosave("look", true);
       G.openSheet("menu");
@@ -14791,6 +15504,26 @@ var Quests = class {
         return { text: "Take contracts from Old Mags and Brother Tallow" };
     }
   }
+  shipyardObjective() {
+    const G = this.g;
+    if (!this.flags.shipwrightIntro) {
+      return { title: "The Shipwright’s Wager", id: "shipwright", text: "Talk to Old Mags after your first treasure haul to hear how the shipyard can be reopened" };
+    }
+    const next = VESSELS.find((vessel) => !G.ownedShips[vessel.id]);
+    if (!next) return { title: "The Shipwright’s Legacy", id: "shipwright", text: "You have earned every hull in Old Mags’ fleet. The next voyage is yours to write" };
+    const progress = vesselProgress(G, next);
+    const tales = {
+      cutter: "Mags will stake her name on a swift cutter for a captain who can make their mark",
+      brigantine: "The old slip can launch a brigantine once your cutter has proven itself",
+      frigate: "A frigate needs a proven captain, a deep purse, and a crew who trust your colors"
+    };
+    const qualified = progress.unlocked && G.ownedShips[next.requires];
+    return {
+      title: `${next.name} commission`,
+      id: "shipwright",
+      text: `${tales[next.id]} ${qualified ? `Its charter is earned; save ${next.price} banked gold to commission it` : `Choose any route: ${progress.text}. One completed route earns its charter`}`
+    };
+  }
   npcMarker(id) {
     const n = this.g.npcs.get(id);
     return n ? { x: n.site.x, z: n.site.z, icon: "npc" } : null;
@@ -14986,6 +15719,7 @@ var Quests = class {
   tracked_() {
     const crew = this.g.net && this.g.net.crewObjective();
     if (crew) return crew;
+    if (this.tracked === "shipwright" && this.flags.shipwrightIntro) return this.shipyardObjective();
     if (this.tracked !== "story") {
       const q = this.active.find((x) => x.id === this.tracked);
       if (q) return { title: q.title, ...this.contractObjective(q), id: q.id };
@@ -15125,7 +15859,7 @@ var Quests = class {
   dialog(npc) {
     const G = this.g, st = this.id, ph = this.phase;
     const name = G.look.name;
-    const d = { npc, greeting: "", story: null, ready: [], offers: [], bank: npc === "mags" && (G.gold > 0 || G.lootValue(G.inv) > 0), shop: npc === "mags", rest: null };
+    const d = { npc, greeting: "", story: null, shipwright: null, ready: [], offers: [], bank: npc === "mags" && (G.gold > 0 || G.lootValue(G.inv) > 0), shop: npc === "mags", rest: null };
     if (npc === "mags") {
       d.greeting = G.sky.isNight ? `Up late, ${name}? The Hollowmen walk at night. Keep to the lantern light.` : `Ahoy, ${name}. Gold is safer in my strongbox than in your pockets.`;
       if (st === "landfall") d.greeting = `So you’re the new captain. Chop some wood, craft planks, then take that sloop out. I marked an X for you on ${this.iname(G.world.firstMap.island)}.`;
@@ -15139,6 +15873,19 @@ var Quests = class {
         this.pay(800, "Old Mags trades the pearl for 800 gold.");
         this.advance();
       } };
+      if (this.step >= 2) {
+        d.shipwright = this.flags.shipwrightIntro ? { text: this.shipyardObjective().text, button: "Visit the shipyard", act: () => G.openSheet("shop", { npc: "mags" }) } : {
+          text: "Mags once lost her brother’s cutter to the Hollow Wake. She has kept the shipwright’s slip closed ever since. Prove your captaincy through the story, contracts, exploration, or combat, and she will vouch for a stronger hull.",
+          button: "Take the Shipwright’s Wager",
+          act: () => {
+            this.flags.shipwrightIntro = true;
+            this.tracked = "shipwright";
+            G.sfx.bell();
+            G.ui.toast("The Shipwright’s Wager", "Story, contracts, exploration, or combat can each earn a ship charter.", "chapter");
+            G.autosave("shipwright", true);
+          }
+        };
+      }
       d.rest = G.sky.isNight ? { label: "Rest until morning", act: () => G.skipTo("day") } : null;
     } else {
       d.greeting = this.flags.lit ? `The light holds, ${name}. Bless your oil.` : "The lamp is cold. Without oil, the dead wander closer every night.";
@@ -16795,7 +17542,7 @@ var Settings = class {
 
 // src/net.js
 import * as THREE24 from "three";
-var PROTO = 4;
+var PROTO = 5;
 var SEND = 0.1;
 var BUDGET = 3800;
 var MAX_CREW = 3;
@@ -16814,8 +17561,8 @@ var size = (o) => enc.encode(JSON.stringify(o)).length;
 var r1 = (v) => Math.round(v * 10) / 10;
 var r2 = (v) => Math.round(v * 100) / 100;
 var r3 = (v) => Math.round(v * 1e3) / 1e3;
-var fin = (v) => typeof v === "number" && Number.isFinite(v);
-var num = (v, lo, hi, d = 0) => fin(v) ? clamp(v, lo, hi) : d;
+var fin2 = (v) => typeof v === "number" && Number.isFinite(v);
+var num = (v, lo, hi, d = 0) => fin2(v) ? clamp(v, lo, hi) : d;
 var int = (v, lo, hi, d = 0) => Math.round(num(v, lo, hi, d));
 var peerId = (v) => typeof v === "string" && v.length > 0 && v.length <= 64 ? v : null;
 var BAD = new RegExp("[\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u061c\\u180e\\u200b-\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]", "g");
@@ -16992,7 +17739,7 @@ var Mate = class {
       }
     }
     const p = pr.p;
-    if (Array.isArray(p) && p.length >= 14 && fin(p[0]) && fin(p[2])) {
+    if (Array.isArray(p) && p.length >= 14 && fin2(p[0]) && fin2(p[2])) {
       const x = num(p[0], 0, W), y = num(p[1], -20, H + 30), z = num(p[2], 0, D);
       const now = performance.now();
       if (this.has && now - this.at > 15) {
@@ -17013,14 +17760,14 @@ var Mate = class {
       this.mode = MODES[int(p[7], 0, MODES.length - 1)];
       this.local.set(num(p[8], -4, 4), num(p[9], -2, 12), num(p[10], -9, 9));
       this.gun = this.mode === "deck" ? int(p[14], -1, GUNS.length - 1) : -1;
-      this.shipNid = this.mode === "deck" && fin(p[15]) ? int(p[15], 0, 1e9) : 0;
+      this.shipNid = this.mode === "deck" && fin2(p[15]) ? int(p[15], 0, 1e9) : 0;
       this.hp = num(p[11], 0, 500, 100);
       this.maxHp = num(p[12], 1, 500, 100);
       this.alive = this.anim !== "dead";
       const sw = int(p[13], 0, 1e9);
       if (this.swingN >= 0 && sw !== this.swingN) this.swing = 1;
       this.swingN = sw;
-      const sn = fin(p[16]) ? int(p[16], 0, 1e3) : -1;
+      const sn = fin2(p[16]) ? int(p[16], 0, 1e3) : -1;
       if (this.shotN >= 0 && sn >= 0 && sn !== this.shotN && isGun(this.item) && this.G.state !== "title") {
         const c = Math.cos(this.tyaw), s2 = Math.sin(this.tyaw);
         this.G.guns.remoteShot(this.tp.x + c * 0.3 - s2 * 0.7, this.tp.y + 1.45, this.tp.z - s2 * 0.3 - c * 0.7, this.tyaw, this.pitch, this.item);
@@ -17028,7 +17775,7 @@ var Mate = class {
       }
       this.shotN = sn;
     }
-    const say = Array.isArray(pr.say) && pr.say.length === 2 && fin(pr.say[0]) ? pr.say : null;
+    const say = Array.isArray(pr.say) && pr.say.length === 2 && fin2(pr.say[0]) ? pr.say : null;
     if (this.sayAt === -1) this.sayAt = say ? say[0] : 0;
     else if (say && say[0] !== this.sayAt) {
       this.sayAt = say[0];
@@ -17488,7 +18235,7 @@ var Net = class {
     if (pr === rec.pres) return true;
     rec.pres = pr;
     rec.mate.apply(pr);
-    if (fin(pr.ak)) rec.ack = clamp(Math.max(rec.ack, pr.ak), 0, this.seq);
+    if (fin2(pr.ak)) rec.ack = clamp(Math.max(rec.ack, pr.ak), 0, this.seq);
     rec.got = int(pr.got, 0, 1e9);
     const rs = int(pr.rs, 0, 1e6);
     if (rs !== rec.rs) {
@@ -17500,7 +18247,7 @@ var Net = class {
     }
     if (Array.isArray(pr.ev)) {
       for (const e of pr.ev) {
-        if (!Array.isArray(e) || !fin(e[0]) || e[0] <= rec.inSeq) continue;
+        if (!Array.isArray(e) || !fin2(e[0]) || e[0] <= rec.inSeq) continue;
         rec.inSeq = e[0];
         try {
           this.hostHandle(rec, e);
@@ -17782,7 +18529,7 @@ var Net = class {
     const mk = tr.marker;
     o.ob = [clean(tr.title, 60), clean(tr.text, 160), mk ? r1(mk.x) : null, mk ? r1(mk.z) : null, mk ? ICONS.indexOf(mk.icon) : -1];
     o.mk = G.quests.markers().slice(0, 5).map((m) => [ICONS.indexOf(m.icon), r1(m.x), r1(m.z), m.tracked ? 1 : 0, m.r ? r1(m.r) : 0]);
-    if (s) o.sh = [s.nid, r2(s.pos.x), r2(s.pos.z), r3(s.heading), r2(s.speed), r2(s.sailLvl), r2(s.rudder), Math.round(s.hp), s.maxHp, s.sinking ? 1 : 0, s.guns, s.reverse ? 1 : 0];
+    if (s) o.sh = [s.nid, r2(s.pos.x), r2(s.pos.z), r3(s.heading), r2(s.speed), r2(s.sailLvl), r2(s.rudder), Math.round(s.hp), s.maxHp, s.sinking ? 1 : 0, s.guns, s.reverse ? 1 : 0, Math.max(0, PLAYER_VESSELS.findIndex((v) => v.id === s.design.id))];
     o.hl = this.helmPeer || (P.mode === "helm" && P.alive ? this.me : null);
     o.hs = G.hollows.slice(0, 7).map((h2) => [h2.nid, h2.variant === "flagship" ? 1 : 0, r2(h2.pos.x), r2(h2.pos.z), r3(h2.heading), r2(h2.speed), r2(h2.sailLvl), r2(h2.rudder), Math.round(h2.hp), h2.maxHp, h2.sinking ? 1 : 0, Math.max(0, FLEET_KINDS.indexOf(h2.kind)), SHIP_NAMES[h2.kind] ? Math.max(0, SHIP_NAMES[h2.kind].indexOf(h2.name)) : 0, h2.taken ? 1 : 0, h2.looted ? 1 : 0]);
     {
@@ -17929,7 +18676,7 @@ var Net = class {
     hm.role = "host";
     hm.apply(pr);
     if (Array.isArray(pr.ak)) {
-      for (const a of pr.ak) if (Array.isArray(a) && a[0] === this.me && fin(a[1])) {
+      for (const a of pr.ak) if (Array.isArray(a) && a[0] === this.me && fin2(a[1])) {
         const n = a[1];
         if (this.out.length && this.out[0][0] <= n) this.out = this.out.filter((e) => e[0] > n);
       }
@@ -17937,7 +18684,7 @@ var Net = class {
     if (!this.accepted) return;
     if (Array.isArray(pr.ev)) {
       for (const e of pr.ev) {
-        if (!Array.isArray(e) || !fin(e[0]) || e[0] <= this.hostAck) continue;
+        if (!Array.isArray(e) || !fin2(e[0]) || e[0] <= this.hostAck) continue;
         if (this.hostAck && e[0] !== this.hostAck + 1) {
           this.resync();
           break;
@@ -17959,7 +18706,7 @@ var Net = class {
   }
   collect(sn) {
     const [id, base, z, n, count, idx2, data] = sn;
-    if (!fin(id) || !fin(base) || !fin(count) || count < 1 || count > 4e3 || !fin(idx2) || typeof data !== "string") return;
+    if (!fin2(id) || !fin2(base) || !fin2(count) || count < 1 || count > 4e3 || !fin2(idx2) || typeof data !== "string") return;
     if (!this.asm || this.asm.id !== id) this.asm = { id, base, z: z === "deflate-raw" || z === "gzip" ? z : "", n: int(n, 0, VOLUME), count, parts: new Array(count).fill(null), have: 0 };
     const A = this.asm;
     if (idx2 >= 0 && idx2 < A.count && A.parts[idx2] == null) {
@@ -17980,7 +18727,7 @@ var Net = class {
     }
     if (this.role !== "crew" || this.asm !== A) return;
     const ok = [];
-    for (const [i, id] of edits) if (fin(i) && i >= 0 && i < VOLUME && BLOCKS[id]) ok.push([i, id]);
+    for (const [i, id] of edits) if (fin2(i) && i >= 0 && i < VOLUME && BLOCKS[id]) ok.push([i, id]);
     const later = this.buf.filter((e) => e[0] > A.base).sort((a, b) => a[0] - b[0]);
     this.buf = [];
     this.asm = null;
@@ -18046,7 +18793,7 @@ var Net = class {
       case "w":
         for (let k = 2; k + 1 < e.length; k += 2) {
           const i = e[k], id = e[k + 1];
-          if (!fin(i) || i < 0 || i >= VOLUME || !fin(id) || !BLOCKS[id]) continue;
+          if (!fin2(i) || i < 0 || i >= VOLUME || !fin2(id) || !BLOCKS[id]) continue;
           G.world.set(i % W, Math.floor(i / (W * D)), Math.floor(i / W) % D, id);
         }
         break;
@@ -18085,7 +18832,7 @@ var Net = class {
         break;
       case "pb": {
         const v = e.slice(2, 8);
-        if (!v.every(fin)) break;
+        if (!v.every(fin2)) break;
         const owner = e[8] === 0 ? G.sloop : this.hollowMap.get(e[8]) || null;
         G.projectiles.spawn(num(v[0], -50, W + 50), num(v[1], -10, 80), num(v[2], -50, D + 50), num(v[3], -80, 80), num(v[4], -80, 80), num(v[5], -80, 80), owner, 1, true);
         if (owner) G.particles.burst(v[0], v[1], v[2], 16757575, 6, 2.5, 1.5, 0, 0.18, 0.2);
@@ -18114,7 +18861,7 @@ var Net = class {
     }
     if (Array.isArray(pr.ob)) {
       const o = pr.ob, ic = ICONS[int(o[4], -1, ICONS.length - 1, -1)];
-      this.obj = { title: "Captain’s orders", text: clean(o[1], 160) || "Follow the captain", marker: fin(o[2]) && fin(o[3]) && ic ? { x: num(o[2], 0, W), z: num(o[3], 0, D), icon: ic } : null, id: "crew" };
+      this.obj = { title: "Captain’s orders", text: clean(o[1], 160) || "Follow the captain", marker: fin2(o[2]) && fin2(o[3]) && ic ? { x: num(o[2], 0, W), z: num(o[3], 0, D), icon: ic } : null, id: "crew" };
     }
     if (Array.isArray(pr.mk)) {
       this.marks = pr.mk.slice(0, 6).filter((m) => Array.isArray(m) && ICONS[m[0]]).map((m) => ({ icon: ICONS[m[0]], x: num(m[1], 0, W), z: num(m[2], 0, D), tracked: m[3] === 1, r: m[4] > 0 ? num(m[4], 0, 40) : void 0 }));
@@ -18123,14 +18870,14 @@ var Net = class {
     this.syncSloop(pr.sh, now);
     this.syncHollows(Array.isArray(pr.hs) ? pr.hs : [], now);
     this.syncSkeletons(Array.isArray(pr.e) ? pr.e : []);
-    G.crews.syncPuppets((Array.isArray(pr.cr) ? pr.cr : []).filter((e) => Array.isArray(e) && e.length >= 12 && e.every(fin)).slice(0, 32).map((e) => [e[0], e[1], int(e[2], 0, 3), int(e[3], 0, 3), int(e[4], 0, 1e5), num(e[5], -4, 4), num(e[6], -2, 12), num(e[7], -9, 9), num(e[8], -10, 10), int(e[9], 0, 5), int(e[10], 0, 1e3), int(e[11], 0, 100)]), (n) => this.hollowMap.get(n) || null);
+    G.crews.syncPuppets((Array.isArray(pr.cr) ? pr.cr : []).filter((e) => Array.isArray(e) && e.length >= 12 && e.every(fin2)).slice(0, 32).map((e) => [e[0], e[1], int(e[2], 0, 3), int(e[3], 0, 3), int(e[4], 0, 1e5), num(e[5], -4, 4), num(e[6], -2, 12), num(e[7], -9, 9), num(e[8], -10, 10), int(e[9], 0, 5), int(e[10], 0, 1e3), int(e[11], 0, 100)]), (n) => this.hollowMap.get(n) || null);
     this.syncKraken(Array.isArray(pr.k) ? pr.k : null);
     this.syncLoot(Array.isArray(pr.L) ? pr.L : []);
   }
   syncSloop(sh, now) {
     const G = this.g, P = G.player;
     let s = G.sloop;
-    if (!Array.isArray(sh) || sh.length < 12 || !sh.slice(0, 9).every(fin)) {
+    if (!Array.isArray(sh) || sh.length < 13 || !sh.slice(0, 9).every(fin2) || !fin2(sh[12])) {
       if (s && s.remote) {
         if (P.mode !== "foot") P.leaveShip(s);
         G.removeShip(s);
@@ -18138,12 +18885,13 @@ var Net = class {
       return;
     }
     const nid = sh[0], x = num(sh[1], 0, W), z = num(sh[2], 0, D), h2 = num(sh[3], -1e3, 1e3);
-    if (!s || !s.remote || s.remote.nid !== nid) {
+    const vessel = PLAYER_VESSELS[int(sh[12], 0, PLAYER_VESSELS.length - 1)];
+    if (!s || !s.remote || s.remote.nid !== nid || s.design.id !== vessel.id) {
       if (s) {
         if (P.mode !== "foot") P.leaveShip(s);
         G.removeShip(s);
       }
-      s = new Ship(G.scene, "sloop", { look: this.hostLook || G.look });
+      s = new Ship(G.scene, "sloop", { look: this.hostLook || G.look, playerVessel: vessel.id });
       s.remote = { nid, x, z, h: h2, speed: 0, sail: 0, rudder: 0, at: now, snap: true, mine: false };
       s.place(x, z, h2);
       G.sloop = s;
@@ -18169,7 +18917,7 @@ var Net = class {
   syncHollows(list, now) {
     const G = this.g, seen = /* @__PURE__ */ new Set();
     for (const e of list.slice(0, 7)) {
-      if (!Array.isArray(e) || e.length < 11 || !e.slice(0, 10).every(fin)) continue;
+      if (!Array.isArray(e) || e.length < 11 || !e.slice(0, 10).every(fin2)) continue;
       const nid = e[0];
       seen.add(nid);
       let s = this.hollowMap.get(nid);
@@ -18209,7 +18957,7 @@ var Net = class {
   syncSkeletons(list) {
     const G = this.g, E = G.enemies, seen = /* @__PURE__ */ new Set();
     for (const e of list.slice(0, 24)) {
-      if (!Array.isArray(e) || e.length < 9 || !e.every(fin)) continue;
+      if (!Array.isArray(e) || e.length < 9 || !e.every(fin2)) continue;
       const nid = e[0];
       seen.add(nid);
       const st = int(e[6], 0, 2), x = num(e[2], 0, W), y = num(e[3], -10, H + 10), z = num(e[4], 0, D);
@@ -18244,13 +18992,13 @@ var Net = class {
   }
   syncKraken(k) {
     const G = this.g;
-    if (k && k.length >= 7 && k.slice(0, 6).every(fin) && Array.isArray(k[6])) {
+    if (k && k.length >= 7 && k.slice(0, 6).every(fin2) && Array.isArray(k[6])) {
       if (!G.kraken || !G.kraken.remote) {
         if (G.kraken) G.killKraken();
         G.kraken = new KrakenPuppet(G);
         G.ui.toast("The Deep One", "The sea boils around the hull. Hack at the tentacles with your cutlass!", "curse");
       }
-      const tents = k[6].slice(0, 12).filter((t) => Array.isArray(t) && t.length >= 8 && t.every(fin)).map((t) => [t[0], num(t[1], -100, 100), num(t[2], 2, 20), num(t[3], 0, 1), num(t[4], 0, 3), t[5], num(t[6], 0, 1), num(t[7], -100, 100)]);
+      const tents = k[6].slice(0, 12).filter((t) => Array.isArray(t) && t.length >= 8 && t.every(fin2)).map((t) => [t[0], num(t[1], -100, 100), num(t[2], 2, 20), num(t[3], 0, 1), num(t[4], 0, 3), t[5], num(t[6], 0, 1), num(t[7], -100, 100)]);
       G.kraken.apply([int(k[0], 0, 2), num(k[1], 0, 1e4), num(k[2], 1, 1e4, 200), num(k[3], 0, W), num(k[4], -40, 40), num(k[5], 0, D), tents]);
     } else if (G.kraken && G.kraken.remote) {
       G.kraken.dispose();
@@ -18261,7 +19009,7 @@ var Net = class {
   syncLoot(list) {
     const G = this.g, seen = /* @__PURE__ */ new Set();
     for (const e of list.slice(0, 10)) {
-      if (!Array.isArray(e) || e.length < 3 || !e.every(fin)) continue;
+      if (!Array.isArray(e) || e.length < 3 || !e.every(fin2)) continue;
       seen.add(e[0]);
       if (!this.lootMap.has(e[0])) this.lootMap.set(e[0], G.props.spawnLoot(num(e[1], 0, W), num(e[2], 0, D), 0, e[0]));
     }
@@ -18625,6 +19373,8 @@ var Game = class {
     this.stats = { wood: 0, crafted: 0, boarded: 0, kills: 0, ships: 0, blocks: 0, placed: 0, chests: 0 };
     this.upgrades = {};
     this.hints = {};
+    this.ownedShips = { sloop: true };
+    this.shipType = "sloop";
     this.pet = null;
     if (this.avatar) this.avatar.setPet(null);
   }
@@ -18705,6 +19455,8 @@ var Game = class {
       v: 4,
       seed: SEED,
       version: VERSION,
+      mapW: W,
+      mapD: D,
       look: { ...this.look },
       inv: { ...this.inv },
       chest: { ...this.chest },
@@ -18719,6 +19471,8 @@ var Game = class {
       upgrades: { ...this.upgrades },
       hints: { ...this.hints },
       pet: this.pet,
+      ownedShips: { ...this.ownedShips },
+      shipType: this.shipType,
       time: this.time,
       wind: this.wind.angle,
       camMode: this.camMode,
@@ -18905,10 +19659,12 @@ var Game = class {
     const savedVersion = (d.version || doc.meta?.version || "0.0.0").split(".").map(Number);
     const oldWorld = savedVersion.length === 3 && savedVersion.every(Number.isFinite) && (savedVersion[0] < 0 || savedVersion[0] === 0 && (savedVersion[1] < 6 || savedVersion[1] === 6 && savedVersion[2] < 12));
     const oldMap = savedVersion.length !== 3 || !savedVersion.every(Number.isFinite) || savedVersion[0] < 0 || savedVersion[0] === 0 && (savedVersion[1] < 6 || savedVersion[1] === 6 && savedVersion[2] < 16);
-    if (oldMap) {
+    const sourceW = oldMap ? LEGACY_W : Number.isInteger(d.mapW) && d.mapW > 0 ? d.mapW : PREVIOUS_MAP_W;
+    const sourceD = oldMap ? LEGACY_D : Number.isInteger(d.mapD) && d.mapD > 0 ? d.mapD : PREVIOUS_MAP_W;
+    if (oldMap || sourceW !== W || sourceD !== D) {
       edits = edits.map(([i, id]) => {
-        const x = i % LEGACY_W, z = Math.floor(i / LEGACY_W) % LEGACY_D;
-        const y = Math.floor(i / (LEGACY_W * LEGACY_D)) + (oldWorld ? WORLD_Y_SHIFT : 0);
+        const x = i % sourceW, z = Math.floor(i / sourceW) % sourceD;
+        const y = Math.floor(i / (sourceW * sourceD)) + (oldWorld ? WORLD_Y_SHIFT : 0);
         return [x + W * (z + D * y), id];
       });
       if (oldWorld && d.player && Number.isFinite(d.player.y)) d = { ...d, player: { ...d.player, y: d.player.y + WORLD_Y_SHIFT } };
@@ -18962,6 +19718,10 @@ var Game = class {
     Object.assign(this.stats, d.stats || {});
     this.upgrades = { ...d.upgrades || {} };
     this.hints = { ...d.hints || {} };
+    if (d.ownedShips && typeof d.ownedShips === "object" && !Array.isArray(d.ownedShips)) {
+      for (const vessel of PLAYER_VESSELS) if (vessel.id !== "sloop" && d.ownedShips[vessel.id] === true) this.ownedShips[vessel.id] = true;
+    }
+    if (typeof d.shipType === "string" && this.ownedShips[d.shipType]) this.shipType = d.shipType;
     if (this.inv.pistol && !this.hints.gunGift) {
       this.hints.gunGift = 1;
       if (!this.hotbar.includes("pistol")) {
@@ -19015,13 +19775,28 @@ var Game = class {
     P.hunger = 100;
     this.placeAtSpawn();
   }
-  beginVoyage(look) {
+  beginVoyage(look, showGuide = true) {
     this.sheets.close();
     this.newVoyage(look);
+    this.hints.tutorialStep = showGuide ? 0 : 6;
     this.startPlay();
     this.ui.toast("Brine Haven", `Welcome, ${this.look.name}. Old Mags keeps the trading post up the beach, and your sloop waits at the pier.`);
     this.after(7, () => this.ui.toast("Landfall", this.isTouch ? "Hold Hit on a tree trunk to gather wood. The View button shows your captain." : "Hold left click on a tree trunk to gather wood. Press V to see your captain."));
     this.autosave("new", true);
+  }
+  advanceTutorial() {
+    const step = this.hints.tutorialStep;
+    if (!Number.isInteger(step) || step < 0 || step > 5) return;
+    this.hints.tutorialStep = step === 5 ? 6 : step + 1;
+    if (this.hints.tutorialStep === 6) this.ui.toast("Fair winds", "Your guide is complete. Replay it any time from the menu.");
+  }
+  skipTutorial() {
+    if (!Number.isInteger(this.hints.tutorialStep) || this.hints.tutorialStep >= 6) return;
+    this.hints.tutorialStep = 6;
+  }
+  replayTutorial() {
+    this.hints.tutorialStep = 0;
+    this.closeSheet();
   }
   startPlay() {
     this.sfx.init();
@@ -19067,7 +19842,7 @@ var Game = class {
   }
   spawnSloop(sd) {
     this.removeShip(this.sloop);
-    const s = new Ship(this.scene, "sloop", { look: this.look });
+    const s = new Ship(this.scene, "sloop", { look: this.look, playerVessel: this.shipType });
     this.sloop = s;
     if (sd && !s.hullHits(this.world, sd.x, sd.z, sd.h)) s.place(sd.x, sd.z, sd.h);
     else {
@@ -19105,11 +19880,15 @@ var Game = class {
   applyUpgrades() {
     const u = this.upgrades, s = this.sloop, P = this.player;
     if (s && !s.remote) {
-      s.maxHp = 120 + (u.hull1 ? 40 : 0) + (u.hull2 ? 50 : 0);
+      s.maxHp = s.design.hp + (u.hull1 ? 40 : 0) + (u.hull2 ? 50 : 0);
       s.hp = Math.min(s.hp, s.maxHp);
+      s.baseSpeed = s.design.speed;
+      s.maxSpeed = s.baseSpeed;
       s.speedMul = 1 + (u.sails1 ? 0.12 : 0) + (u.sails2 ? 0.13 : 0);
-      s.guns = u.guns ? 3 : 2;
+      s.turnMul = s.design.turn * (u.rudder ? 1.15 : 1);
+      s.guns = Math.max(s.design.guns, u.guns ? 3 : 2);
       s.reloadMul = u.reload ? 0.75 : 1;
+      s.armorMul = u.keel ? 0.85 : 1;
     }
     P.maxHp = 100 + (u.coat ? 30 : 0);
     P.hp = Math.min(P.hp, P.maxHp);
@@ -20559,7 +21338,7 @@ var Game = class {
   }
   buyUpgrade(id) {
     const u = UPGRADES.find((x) => x.id === id);
-    if (!u || this.upgrades[id] || u.req && !this.upgrades[u.req] || this.banked < u.price) return false;
+    if (!u || this.upgrades[id] || u.req && !this.upgrades[u.req] || u.reqVessel && !this.ownedShips[u.reqVessel] || this.banked < u.price) return false;
     this.banked -= u.price;
     this.upgrades[id] = true;
     this.applyUpgrades();
@@ -20568,6 +21347,35 @@ var Game = class {
     this.sfx.coin();
     this.ui.toast(u.name, u.desc, "good");
     this.autosave("shop", true);
+    return true;
+  }
+  refitVessel(id) {
+    const vessel = PLAYER_VESSELS.find((v) => v.id === id);
+    if (!vessel || this.net.inCrew || this.player.mode !== "foot" || this.player.ship || !this.world.dock) return false;
+    const hpRatio = this.sloop && this.sloop.maxHp > 0 ? clamp(this.sloop.hp / this.sloop.maxHp, 0, 1) : 1;
+    const dock = this.world.dock;
+    this.shipType = id;
+    this.spawnSloop({ x: dock.x, z: dock.z, h: dock.heading, hp: 1 });
+    this.sloop.hp = Math.max(1, Math.round(this.sloop.maxHp * hpRatio));
+    this.sfx.place();
+    return true;
+  }
+  selectVessel(id) {
+    const vessel = PLAYER_VESSELS.find((v) => v.id === id);
+    if (!vessel || this.shipType === id || !this.ownedShips[id] || !this.refitVessel(id)) return false;
+    this.autosave("shipyard", true);
+    this.ui.toast(`${vessel.label} in service`, "Old Mags has your previous boat berthed at Brine Haven.", "good");
+    return true;
+  }
+  buyVessel(id) {
+    const vessel = VESSELS.find((v) => v.id === id);
+    if (!vessel || this.ownedShips[id] || !this.quests.flags.shipwrightIntro || !this.ownedShips[vessel.requires] || !vesselProgress(this, vessel).unlocked || this.banked < vessel.price) return false;
+    if (!this.refitVessel(id)) return false;
+    this.banked -= vessel.price;
+    this.ownedShips[id] = true;
+    this.sfx.coin();
+    this.ui.toast(`${vessel.name} commissioned`, `${vessel.desc} Old Mags has your former vessel berthed at Brine Haven.`, "good");
+    this.autosave("shipyard", true);
     return true;
   }
   buySupply(i) {
@@ -20733,25 +21541,19 @@ var Game = class {
     this.particles.burst(s.pos.x, s.pos.y + 1.3, s.pos.z, 12620124, 10, 1.5, 2, 12, 0.6, 1.5);
     this.ui.pickup("Hull patched, −1 plank");
   }
-  // Ships against ships, hull to hull: each hull is a chain of circles that follows its shape, so ships can lie
-  // alongside each other and a bow can strike a side. Overlaps are pushed apart (the heavier ship gives less
-  // ground), the way they were closing at is taken off, a glancing blow swings them apart, and a hard knock hurts.
+  // Ships against ships: separating axes on the waterline hull outlines allow alongside contact and bow-to-side
+  // impacts without the oversized gaps and false positives from a chain of circles.
   shipCollisions() {
     const ships = [this.sloop, ...this.hollows].filter((s) => s && !s.sinking);
     const MASS = { sloop: 1, merchant: 1.35, navy: 1.6, pirate: 1.15, hollow: 1.2 };
-    for (const s of ships) s.hullCircles();
     for (let i = 0; i < ships.length; i++) for (let j = i + 1; j < ships.length; j++) {
       const a = ships[i], b = ships[j];
       const reach = 6.8 * (a.size + b.size);
       if (Math.abs(b.pos.x - a.pos.x) > reach || Math.abs(b.pos.z - a.pos.z) > reach) continue;
-      let best = null;
-      for (const ca of a.circ) for (const cb of b.circ) {
-        const dx = cb[0] - ca[0], dz = cb[1] - ca[1], d = Math.hypot(dx, dz), pen2 = ca[2] + cb[2] - d;
-        if (pen2 > 0 && (!best || pen2 > best.pen)) best = { pen: pen2, ux: d > 1e-3 ? dx / d : 1, uz: d > 1e-3 ? dz / d : 0, cx: ca[0] + dx / (d || 1) * ca[2], cz: ca[1] + dz / (d || 1) * ca[2] };
-      }
+      const best = a.hullContact(b);
       if (!best) continue;
       const ma = (MASS[a.kind] || 1.2) * (a.variant === "flagship" ? 1.3 : 1), mb = (MASS[b.kind] || 1.2) * (b.variant === "flagship" ? 1.3 : 1);
-      const wa = mb / (ma + mb), wb = ma / (ma + mb), { ux, uz, pen } = best;
+      const wa = mb / (ma + mb), wb = ma / (ma + mb), { nx: ux, nz: uz, depth: pen } = best;
       a.pos.x -= ux * pen * wa;
       a.pos.z -= uz * pen * wa;
       b.pos.x += ux * pen * wb;
@@ -20764,7 +21566,7 @@ var Game = class {
       a.speed -= J * wa * na;
       b.speed += J * wb * nb;
       for (const [s, sign, w] of [[a, 1, wa], [b, -1, wb]]) {
-        const rx = best.cx - s.pos.x, rz = best.cz - s.pos.z;
+        const rx = best.x - s.pos.x, rz = best.z - s.pos.z;
         const torque = (rx * uz - rz * ux) * sign;
         s.heading = wrapAngle(s.heading + clamp(torque * closing * 25e-4 * w, -0.06, 0.06));
       }
@@ -20776,8 +21578,8 @@ var Game = class {
           a.damage(hard * 2.6 * Math.sqrt(mb / ma), this);
           b.damage(hard * 2.6 * Math.sqrt(ma / mb), this);
         }
-        this.sfx.crash(this.distToListener(best.cx, best.cz));
-        this.particles.burst(best.cx, WATER_Y + 1.5, best.cz, 7029798, 12, 3, 3, 12, 0.8, 0.8);
+        this.sfx.crash(this.distToListener(best.x, best.z));
+        this.particles.burst(best.x, WATER_Y + 1.5, best.z, 7029798, 12, 3, 3, 12, 0.8, 0.8);
         if (a === this.sloop || b === this.sloop) this.shake(Math.min(0.9, 0.25 + hard * 0.12));
       }
     }
@@ -21002,10 +21804,10 @@ var Game = class {
       if (P.mode === "deck" || P.mode === "helm") P.leaveShip(ship);
       P.boardCD = 99;
       const full = Object.keys(this.chest).length || this.chestGold > 0;
-      this.ui.toast("Your sloop is going down", full ? "Swim clear. Your sea chest, and everything stowed in it, goes down with her." : "Swim clear. The tide will carry you back to Brine Haven.", "bad");
+      this.ui.toast(`Your ${ship.design.label.toLowerCase()} is going down`, full ? "Swim clear. Your sea chest, and everything stowed in it, goes down with her." : "Swim clear. The tide will carry you back to Brine Haven.", "bad");
       this.chest = {};
       this.chestGold = 0;
-      this.net.toastAll("The ship is going down", "Swim clear! The captain will find a new sloop at Brine Haven.", "bad");
+      this.net.toastAll("The ship is going down", "Swim clear! The captain will find a new boat at Brine Haven.", "bad");
       this.after(4.5, () => this.washAshore());
       return;
     }
@@ -21037,6 +21839,7 @@ var Game = class {
     });
   }
   washAshore() {
+    const vesselName = this.sloop ? this.sloop.design.label.toLowerCase() : "boat";
     this.ui.fade(true);
     this.after(1.2, () => {
       const lost = this.gold + this.dropLoot();
@@ -21049,7 +21852,7 @@ var Game = class {
       P.boardCD = 0;
       for (const h2 of this.hollows) if (h2.kind === "hollow") h2.leaving = true;
       this.ui.fade(false);
-      this.ui.toast("Washed ashore at Brine Haven", lost > 0 ? `The sea kept your ${lost} unbanked gold. Old Mags found you a new sloop.` : "Old Mags found you a new sloop at the pier.", "bad");
+      this.ui.toast("Washed ashore at Brine Haven", lost > 0 ? `The sea kept your ${lost} unbanked gold. Old Mags found you a new ${vesselName}.` : `Old Mags found you a new ${vesselName} at the pier.`, "bad");
     });
   }
   onShipBump(ship) {

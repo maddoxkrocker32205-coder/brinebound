@@ -85,8 +85,14 @@ void main() {
   float fres = pow(1.0 - max(dot(n, V), 0.0), 4.0);
   float diff = 0.62 + 0.38 * max(dot(n, uSunDir), 0.0);
   vec3 Hh = normalize(uSunDir + V);
-  float spec = pow(max(dot(n, Hh), 0.0), 90.0) * uSpec;
+  float ndh = max(dot(n, Hh), 0.0);
+  float spec = (pow(ndh, 90.0) + 0.7 * pow(ndh, 220.0)) * uSpec;
   vec3 col = base * diff * uLight + uSky * fres * 0.35 + uSunCol * spec;
+  if (inside > 0.5 && depth < 0.42) {
+    float caustic = pow(max(0.0, sin((vWorld.x + vWorld.z * 0.72) * 0.18 + uTime * 0.6)
+      * sin((vWorld.z - vWorld.x * 0.63) * 0.2 - uTime * 0.45)), 6.0);
+    col += uSunCol * caustic * (1.0 - smoothstep(0.08, 0.42, depth)) * uLight * 0.18;
+  }
   float shore = (1.0 - smoothstep(0.0, 0.17, depth)) * inside;
   float band = step(0.6, 0.5 + 0.5 * sin(depth * 70.0 - uTime * 2.2 + vWorld.x * 0.13 + vWorld.z * 0.07));
   float foam = shore * band + (1.0 - smoothstep(0.0, 0.035, depth)) * inside * 0.8;

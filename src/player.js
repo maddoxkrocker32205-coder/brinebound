@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { W, D, FLOOR, WATER_Y, clamp } from './config.js';
 import { waveHeight } from './water.js';
-import { SHIP, HELM, LADDER, SIDE_LADDERS, GUNS, halfWidthAt, hullHalfAt, railY, floorAt, ceilingAt, deckObstacles, gunPlace, HATCH, SCALE, HULL_CIRCLES } from './ship.js';
+import { SHIP, HELM, LADDER, SIDE_LADDERS, GUNS, halfWidthAt, hullHalfAt, railY, floorAt, ceilingAt, deckObstacles, gunPlace, HATCH, SCALE } from './ship.js';
 const OBST = deckObstacles();
 import { CRISP } from './world.js';
 

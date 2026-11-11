@@ -4,7 +4,8 @@
 //             128 + mat * 32 + floor * 16 + west * 4 + north, edge kinds 0 none, 1 wall, 2 window, 3 doorway
 //   192..199  stairs (mat * 4 + rot)   200..207 roof (mat * 4 + rot)   208..209 post (mat)
 // rot: the way the stairs climb / the roof rises: 0 north (-z), 1 east (+x), 2 south (+z), 3 west (-x).
-import { T, FACES } from './config.js';
+import { T } from './config.js';
+import { appendRoundedBox } from './geo.js';
 
 export const PIECE_LO = 128, PIECE_HI = 209;
 export const isPiece = (id) => id >= PIECE_LO && id <= PIECE_HI;
@@ -111,19 +112,7 @@ const TILES = [
 ];
 // a textured box into the chunk arrays; texture coordinates in metres so neighbouring pieces line up
 function boxA(A, x0, y0, z0, x1, y1, z1, tile, shade) {
-  for (let f = 0; f < 6; f++) {
-    const F = FACES[f], n = F.dir, v = A.n;
-    for (const cr of F.corners) {
-      const px = cr[0] ? x1 : x0, py = cr[1] ? y1 : y0, pz = cr[2] ? z1 : z0;
-      A.pos.push(px, py, pz); A.nor.push(n[0], n[1], n[2]);
-      if (F.axis === 0) A.uv.push(pz, py); else if (F.axis === 1) A.uv.push(px, pz); else A.uv.push(px, py);
-      A.lay.push(tile);
-      const k = shade * (n[1] < 0 ? 0.7 : 1);
-      A.col.push(k, k, k);
-    }
-    A.ind.push(v, v + 1, v + 2, v + 2, v + 1, v + 3);
-    A.n += 4;
-  }
+  appendRoundedBox(A, x0, y0, z0, x1, y1, z1, [tile, tile, tile, tile, tile, tile], shade, 0);
 }
 // a slanted slab (a roof): the top surface rises from the south edge (y0) to the north edge (y1)
 function slopeA(A, x, y, z, rot, tile, shade, th = 0.12) {

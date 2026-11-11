@@ -10,7 +10,7 @@ window.__bs = (() => {
       for (let dx = -R; dx <= R && ok; dx += 4) for (let dz = -R; dz <= R && ok; dz += 4) if (w.surf[Math.floor(x + dx) + Math.floor(z + dz) * Wd] > SEA - 3) ok = false; if (ok) return { x, z }; } return null; };
   const Ship = g.sloop.constructor;
   const spawn = (kind, x, z, h) => { const s = new Ship(g.scene, kind, {}); s.place(x, z, h); s.sailLvl = 0; g.hollows.push(s); g.crews.man(s); return s; };
-  const pen = (a, b) => { a.hullCircles(); b.hullCircles(); let p = 0; for (const ca of a.circ) for (const cb of b.circ) p = Math.max(p, ca[2] + cb[2] - Math.hypot(cb[0] - ca[0], cb[1] - ca[1])); return p; };
+  const pen = (a, b) => a.hullContact(b)?.depth || 0;
   const clearAll = () => { for (const s of g.hollows.slice()) { g.crews.list = g.crews.list.filter((c) => c.ship !== s); s.dispose(); } g.hollows.length = 0; };
   return { open, spawn, pen, clearAll, Wd };
 })();'''

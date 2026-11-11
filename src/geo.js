@@ -6,6 +6,58 @@ const TRI = [0, 1, 2, 2, 1, 3];
 
 // Merges axis-aligned boxes into one geometry with vertex colours and optional texture-array tiles.
 const GRID = [0, 1 / 3, 2 / 3, 1];
+export function appendRoundedBox(A, x0, y0, z0, x1, y1, z1, layers, shade = 1, radius = 0.06, cornerFactors = null, faceUVs = null, adjacent = null) {
+  const lo = [x0, y0, z0], hi = [x1, y1, z1];
+  const r = Math.min(radius, 0.45 * (x1 - x0), 0.45 * (y1 - y0), 0.45 * (z1 - z0));
+  const P = [0, 0, 0], Q = [0, 0, 0];
+  for (let f = 0; f < 6; f++) {
+    if (layers[f] == null) continue;
+    const F = FACES[f], v = A.n;
+    const c0 = F.corners[0], c1 = F.corners[1], c2 = F.corners[2];
+    const vertex = (s, t) => {
+      for (let axis = 0; axis < 3; axis++) {
+        const u = c0[axis] + (c1[axis] - c0[axis]) * s + (c2[axis] - c0[axis]) * t;
+        const a = Math.round(u * 3) / 3;
+        P[axis] = a === 0 ? lo[axis] : a === 1 ? hi[axis] : a < 0.5 ? lo[axis] + r : hi[axis] - r;
+        const edge = a === 0 ? axis * 2 : a === 1 ? axis * 2 + 1 : -1;
+        Q[axis] = adjacent && edge >= 0 && adjacent[edge] ? P[axis] : Math.min(hi[axis] - r, Math.max(lo[axis] + r, P[axis]));
+      }
+      let nx = P[0] - Q[0], ny = P[1] - Q[1], nz = P[2] - Q[2];
+      const length = Math.hypot(nx, ny, nz);
+      if (length > 1e-7) {
+        nx /= length; ny /= length; nz /= length;
+        P[0] = Q[0] + nx * r; P[1] = Q[1] + ny * r; P[2] = Q[2] + nz * r;
+      } else {
+        nx = F.dir[0]; ny = F.dir[1]; nz = F.dir[2];
+      }
+      A.pos.push(P[0], P[1], P[2]); A.nor.push(nx, ny, nz); A.lay.push(layers[f]);
+      let ao = 1;
+      const factors = cornerFactors && cornerFactors[f];
+      if (factors) ao = factors[0] * (1 - s) * (1 - t) + factors[1] * s * (1 - t) + factors[2] * (1 - s) * t + factors[3] * s * t;
+      const k = shade * ao * (ny < -0.1 ? 0.7 : 1);
+      A.col.push(k, k, k);
+      if (faceUVs && faceUVs[f]) {
+        const uv = faceUVs[f];
+        A.uv.push(
+          uv[0][0] * (1 - s) * (1 - t) + uv[1][0] * s * (1 - t) + uv[2][0] * (1 - s) * t + uv[3][0] * s * t,
+          uv[0][1] * (1 - s) * (1 - t) + uv[1][1] * s * (1 - t) + uv[2][1] * (1 - s) * t + uv[3][1] * s * t,
+        );
+      } else if (F.axis === 0) A.uv.push(P[2], P[1]);
+      else if (F.axis === 1) A.uv.push(P[0], P[2]);
+      else A.uv.push(P[0], P[1]);
+    };
+    let local = 0;
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
+      const s0 = GRID[i], s1 = GRID[i + 1], t0 = GRID[j], t1 = GRID[j + 1];
+      vertex(s0, t0); vertex(s1, t0); vertex(s0, t1);
+      vertex(s0, t1); vertex(s1, t0); vertex(s1, t1);
+      A.ind.push(v + local, v + local + 1, v + local + 2, v + local + 3, v + local + 4, v + local + 5);
+      local += 6;
+    }
+    A.n += 54;
+  }
+}
+
 // Merges boxes into one geometry with vertex colours and optional texture-array tiles. With { round } the
 // boxes get softly rounded edges (smooth normals over a bevel of that radius), so models read as carved
 // and sculpted rather than built from cubes.
@@ -92,6 +144,23 @@ export class GeoBuilder {
     const g = (ey * fz - ez * fy) * n[0] + (ez * fx - ex * fz) * n[1] + (ex * fy - ey * fx) * n[2];
     const u = (v) => [v[0] + v[2], v[1]];
     return g >= 0 ? this.tri(p, n, u(p), q, n, u(q), r, n, u(r), color, layer) : this.tri(p, n, u(p), r, n, u(r), q, n, u(q), color, layer);
+  }
+  ellipsoid(cx, cy, cz, rx, ry, rz, color, layer = T.white, segments = 10, rings = 6) {
+    const point = (theta, phi) => [cx + rx * Math.sin(theta) * Math.cos(phi), cy + ry * Math.cos(theta), cz + rz * Math.sin(theta) * Math.sin(phi)];
+    const normal = (p) => {
+      const n = [(p[0] - cx) / (rx * rx), (p[1] - cy) / (ry * ry), (p[2] - cz) / (rz * rz)];
+      const length = Math.hypot(n[0], n[1], n[2]);
+      return [n[0] / length, n[1] / length, n[2] / length];
+    };
+    for (let j = 0; j < rings; j++) for (let i = 0; i < segments; i++) {
+      const u0 = i / segments, u1 = (i + 1) / segments;
+      const v0 = j / rings, v1 = (j + 1) / rings;
+      const p00 = point(v0 * Math.PI, u0 * Math.PI * 2), p10 = point(v0 * Math.PI, u1 * Math.PI * 2);
+      const p01 = point(v1 * Math.PI, u0 * Math.PI * 2), p11 = point(v1 * Math.PI, u1 * Math.PI * 2);
+      this.otri(p00, normal(p00), [u0, v0], p01, normal(p01), [u0, v1], p10, normal(p10), [u1, v0], color, layer);
+      this.otri(p10, normal(p10), [u1, v0], p01, normal(p01), [u0, v1], p11, normal(p11), [u1, v1], color, layer);
+    }
+    return this;
   }
   // a tapered round post from (x0, y0, z0) to (x1, y1, z1)
   cyl(x0, y0, z0, x1, y1, z1, r0, r1, color, layer = T.white, segs = 10, caps = true) {

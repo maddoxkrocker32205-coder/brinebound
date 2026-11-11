@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { W, D, H, SEA, FLOOR, CS, NCX, OW, WS, LEGACY_W, LEGACY_D, B, BLOCKS, T, FACES, FACE_UV, AO_OFF } from './config.js';
+import { W, D, H, SEA, FLOOR, CS, NCX, OW, WS, LEGACY_W, LEGACY_D, PREVIOUS_MAP_W, B, BLOCKS, T, FACES, FACE_UV, AO_OFF } from './config.js';
 // 0.6 scaled the islands up WS times: peaks rise PS times; the coastline and hill
 // noise runs at NF of its old frequency so a big island gets bigger features and still plenty of them, the
 // the underwater shelf eases down to the shared bedrock floor, and rolling hills break up the inland.
@@ -9,6 +9,7 @@ const shelfHeight = (t) => FLOOR + (SEA - FLOOR) * smooth(SHELF_OUTER, 0.22, t);
 import { mulberry32, makeNoise2, fbm, hash3 } from './noise.js';
 import { surfaceNets, triangulate, columnIndex, columnDown, columnRay, RELAX } from './surface.js';
 import { PIECE_LO, PIECE_HI, isCode, pieceBoxes, pieceBlocks, partBoxes, emitPiece } from './pieces.js';
+import { appendRoundedBox, GeoBuilder } from './geo.js';
 
 const AO_CURVE = [0.5, 0.66, 0.83, 1.0];
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -21,12 +22,14 @@ for (let i = 0; i < 256; i++) OPAQUE[i] = BLOCKS[i] && BLOCKS[i].solid ? 1 : 0;
 //   TERRAIN  smooth ground (one rounded surface across all of them); bodies walk on that surface
 //   LEAFY    smooth leafy canopies; bodies pass through
 //   WOODY    round trunks and logs; bodies bump into them as blocks
-//   CRISP    crafted things (planks, bricks, chests, barrels...) drawn and felt as blocks
+//   CRISP    crafted things with block collision; props and building materials get shaped visuals
 const wrapA = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 export const TERRAIN = new Uint8Array(256), LEAFY = new Uint8Array(256), WOODY = new Uint8Array(256), CRISP = new Uint8Array(256), HARD = new Uint8Array(256), PIECE = new Uint8Array(256);
 for (let i = PIECE_LO; i <= PIECE_HI; i++) PIECE[i] = 1;
 for (const id of [B.GRASS, B.DIRT, B.SAND, B.STONE, B.MARK, B.SLATE, B.BONE, B.BASALT, B.ASH, B.OBSIDIAN, B.MAGMA, B.CORAL_A, B.CORAL_B, B.BEDROCK]) TERRAIN[id] = 1;
 for (const id of [B.LEAVES, B.JLEAVES]) LEAFY[id] = 1;
+const CANOPY = new Uint8Array(256);
+for (const id of [B.LEAVES, B.JLEAVES, B.FROND, B.COCONUT, B.VINE]) CANOPY[id] = 1;
 for (const id of [B.LOG, B.PALM, B.JLOG]) WOODY[id] = 1;
 for (const id of [B.PLANK, B.CHEST, B.BRICK, B.CLOTH, B.VAULT, B.LAMP, B.MOSSBRICK, B.WHITEBRICK, B.WRECKWOOD, B.BARREL, B.CRATE, B.KEG]) CRISP[id] = 1;
 for (let i = 0; i < 256; i++) HARD[i] = CRISP[i] || WOODY[i] || PIECE[i];
@@ -42,6 +45,11 @@ function toGeometry(Q) {
   if (Q.sway) g.setAttribute('sway', new THREE.Float32BufferAttribute(Q.sway, 1));
   g.setIndex(Q.ind);
   return g;
+}
+rawRoof(x, y, z, id) {
+  if (!this.inside(x, y, z)) return;
+  this.raw(x, y, z, id);
+  if (id !== B.AIR) this.hiddenRoofCells.add(x + W * (z + D * y));
 }
 const lin = (hex) => { _c.setHex(hex); return [_c.r, _c.g, _c.b]; };
 // ground colours (top, side), detail mix (sand, grass, rock, dirt) and glow
@@ -70,6 +78,7 @@ export class World {
   constructor(seed) {
     this.seed = seed;
     this.data = new Uint8Array(W * D * H);
+    this.treeFoliage = null;
     this.surf = new Int16Array(W * D);
     this.islandOf = new Int8Array(W * D);
     this.edits = new Map();
@@ -78,6 +87,8 @@ export class World {
     this.sites = {};
     this.group = new THREE.Group();
     this.meshes = new Map();
+    this.structureDetails = [];
+    this.hiddenRoofCells = new Set();
     this.dirty = new Set();
     this.depthDirty = new Set();
     this.lamps = new Set();
@@ -97,18 +108,34 @@ export class World {
     return this.data[x + W * (z + D * y)];
   }
   solid(x, y, z) { return OPAQUE[this.get(x, y, z)] === 1; }
-  raw(x, y, z, id) { if (this.inside(x, y, z)) this.data[x + W * (z + D * y)] = id; }
+  raw(x, y, z, id) {
+    if (!this.inside(x, y, z)) return;
+    const i = x + W * (z + D * y), old = this.data[i];
+    this.data[i] = id;
+    if (this.treeFoliage && (CANOPY[id] || CANOPY[old])) {
+      if (CANOPY[id]) this.treeFoliage.add(i);
+      else this.treeFoliage.delete(i);
+    }
+  }
   rawIfAir(x, y, z, id) {
     if (!this.inside(x, y, z)) return;
     const i = x + W * (z + D * y);
-    if (this.data[i] === 0) this.data[i] = id;
+    if (this.data[i] === 0) {
+      this.data[i] = id;
+      if (this.treeFoliage && CANOPY[id]) this.treeFoliage.add(i);
+    }
   }
   set(x, y, z, id, record = true) {
     if (!this.inside(x, y, z) || y < FLOOR) return false;
     const i = x + W * (z + D * y);
     const old = this.data[i];
     if (old === id) return false;
+    this.hiddenRoofCells.delete(i);
     this.data[i] = id;
+    if (this.treeFoliage && (CANOPY[id] || CANOPY[old])) {
+      if (CANOPY[id]) this.treeFoliage.add(i);
+      else this.treeFoliage.delete(i);
+    }
     if (record) { this.edits.set(i, id); if (this.onEdit) this.onEdit(i, id); }
     if (old === B.LAMP) this.lamps.delete(i);
     if (id === B.LAMP) this.lamps.add(i);
@@ -130,6 +157,56 @@ export class World {
     if (x < 0 || z < 0 || x >= W || z >= D) return FLOOR - 1;
     for (let y = H - 1; y >= FLOOR; y--) if (OPAQUE[this.data[x + W * (z + D * y)]]) return y;
     return FLOOR - 1;
+  }
+  anchorTreeRoots() {
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+      const y = this.surf[x + z * W], id = this.get(x, y, z);
+      if (!WOODY[id] || this.solid(x, y - 1, z)) continue;
+      let ground = y - 2, groundId = B.AIR;
+      for (; ground >= FLOOR; ground--) {
+        groundId = this.get(x, ground, z);
+        if (this.solid(x, ground, z) && !WOODY[groundId] && !LEAFY[groundId] && groundId !== B.FROND && groundId !== B.VINE && groundId !== B.BAMBOO) break;
+      }
+      if (ground < FLOOR) continue;
+      const support = ground < SEA ? B.LOG : B.DIRT;
+      for (let py = ground + 1; py < y; py++) if (this.get(x, py, z) === B.AIR) this.raw(x, py, z, support);
+    }
+  }
+  pruneDetachedFoliage() {
+    const foliage = this.treeFoliage;
+    if (!foliage) return;
+    const plane = W * D, queue = [];
+    while (foliage.size) {
+      const seed = foliage.values().next().value;
+      foliage.delete(seed);
+      queue.push(seed);
+      let anchored = false;
+      for (let head = 0; head < queue.length; head++) {
+        const i = queue[head], y = Math.floor(i / plane), rem = i - y * plane;
+        const z = Math.floor(rem / W), x = rem - z * W;
+        for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy, zz = z + dz;
+          if (!this.inside(xx, yy, zz)) continue;
+          const n = xx + W * (zz + D * yy), id = this.data[n];
+          if (WOODY[id]) anchored = true;
+          if (foliage.delete(n)) queue.push(n);
+        }
+      }
+      if (!anchored) for (const i of queue) {
+        const y = Math.floor(i / plane), rem = i - y * plane;
+        const z = Math.floor(rem / W);
+        this.raw(rem - z * W, y, z, B.AIR);
+      }
+      queue.length = 0;
+    }
+  }
+  supportGround(x, z, baseY, landId = B.STONE, waterId = B.LOG, record = false) {
+    const ground = this.topSolid(x, z), id = ground < SEA ? waterId : landId;
+    for (let y = ground + 1; y < baseY; y++) {
+      if (this.get(x, y, z) !== B.AIR) continue;
+      if (record) this.set(x, y, z, id);
+      else this.raw(x, y, z, id);
+    }
   }
   groundBelow(x, fromY, z) {
     for (let y = Math.min(H - 1, fromY); y >= FLOOR; y--) if (this.solid(x, y, z)) return y;
@@ -160,18 +237,20 @@ export class World {
   generate() {
     this.data.fill(0); this.surf.fill(FLOOR); this.islandOf.fill(-1);
     this.edits.clear(); this.reserved = []; this.dirty.clear(); this.depthDirty.clear(); this.lamps.clear();
-    this.sites = { wrecks: [], loot: [] };
+    this.sites = { wrecks: [], loot: [], villages: [], structures: [] };
+    this.structureDetails = [];
+    this.hiddenRoofCells.clear();
     this.bw = OW; this.bd = OW;
     const rnd = mulberry32(this.seed);
     const nWarp = makeNoise2(this.seed + 11), nH = makeNoise2(this.seed + 23), nD = makeNoise2(this.seed + 37);
     this.nWarp = nWarp; this.nH = nH; this.nD = nD;
     const hills = (x, z, t) => this.hills(x, z, t);
-    const isl = [{ name: 'Brine Haven', x: 114 * WS, z: 128 * WS, r: 30 * WS, peak: 6 * PS, type: 'outpost' }];
+    const isl = [{ name: 'Brine Haven', x: 114 * WS, z: 128 * WS, r: 38 * WS, placementR: 30 * WS, peak: 8 * PS, type: 'outpost' }];
     for (let tries = 0; isl.length < 9 && tries < 8000; tries++) {
       const type = ISLAND_TYPES[isl.length - 1];
       const r = WS * (type === 'rock' ? 15 + rnd() * 7 : type === 'palm' ? 17 + rnd() * 8 : 21 + rnd() * 9);
       const x = 26 * WS + rnd() * (OW - 52 * WS), z = 26 * WS + rnd() * (OW - 52 * WS);
-      if (isl.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 10 * WS)) continue;
+      if (isl.some((o) => Math.hypot(o.x - x, o.z - z) < (o.placementR ?? o.r) + r + 10 * WS)) continue;
       const peak = PS * (type === 'palm' ? 3 + rnd() * 2.5 : type === 'forest' ? 8 + rnd() * 5 : type === 'rock' ? 13 + rnd() * 6 : 8 + rnd() * 3);
       isl.push({ name: ISLAND_NAMES[isl.length - 1], x, z, r, peak, type });
     }
@@ -220,8 +299,10 @@ export class World {
     }
     const idx = (name) => isl.findIndex((o) => o.name === name);
     this.buildOutpost();
+    this.buildVillage(isl[0], 'major');
     const lc = idx('Lantern Cay'); if (lc >= 0) this.buildLighthouse(lc);
     const sb = idx('Saltbone Isle'); if (sb >= 0) this.sites.camp = this.buildCamp(sb, rnd, false);
+    this.treeFoliage = new Set();
     this.decorate(rnd);
     const mc = isl.findIndex((o) => o.type === 'skull');
     if (mc >= 0) this.ribs(isl[mc]);
@@ -231,6 +312,10 @@ export class World {
     this.expand();
     this.moreIslands();
     this.frontierIslands();
+    this.extendedIslands();
+    this.anchorTreeRoots();
+    this.pruneDetachedFoliage();
+    this.treeFoliage = null;
     this.dirty.clear(); this.depthDirty.clear();
     // where land stood above the waterline when the world was made: digging there never lets the sea in
     this.landMask = new Uint8Array(W * D);
@@ -244,13 +329,18 @@ export class World {
 
   // level a roughly circular patch of island to height g, leaving the coastline alone
   flatten(cx, cz, rad, g, topId) {
+    const grade = Math.max(3, Math.min(7, Math.round(rad * 0.18)));
     for (let x = cx - rad; x <= cx + rad; x++) for (let z = cz - rad; z <= cz + rad; z++) {
-      if (!this.inside(x, 0, z) || Math.hypot(x - cx, z - cz) > rad + 0.5) continue;
-      if (this.surf[x + z * W] < SEA - 1) continue;
-      for (let y = FLOOR; y < g; y++) if (!OPAQUE[this.data[x + W * (z + D * y)]]) this.raw(x, y, z, y < g - 1 ? B.DIRT : topId);
-      this.raw(x, g - 1, z, topId);
-      for (let y = g; y < H; y++) this.raw(x, y, z, B.AIR);
-      this.surf[x + z * W] = g;
+      const i = x + z * W, distance = Math.hypot(x - cx, z - cz);
+      if (!this.inside(x, 0, z) || distance > rad + 0.5) continue;
+      const original = this.surf[i];
+      if (original < SEA - 1) continue;
+      const edge = smooth(rad - grade, rad, distance);
+      const level = Math.round(g + (original - g) * edge);
+      for (let y = FLOOR; y < level; y++) if (!OPAQUE[this.data[x + W * (z + D * y)]]) this.raw(x, y, z, y < level - 1 ? B.DIRT : topId);
+      this.raw(x, level - 1, z, topId);
+      for (let y = level; y < H; y++) this.raw(x, y, z, B.AIR);
+      this.surf[i] = level;
     }
   }
 
@@ -297,6 +387,184 @@ export class World {
     this.reserved.push({ x0: stx - 7, x1: sx + 42, z0: stz - 5, z1: zc + 15 });
   }
 
+  buildVillage(o, tier) {
+    const island = this.islands.indexOf(o), major = tier === 'major', village = tier === 'village';
+    if (island < 0) return null;
+    const radius = Math.min(major ? 42 : village ? 27 : 19, Math.floor(o.r * 0.55));
+    const angle = o.name === 'Brine Haven' ? Math.PI : hash3(island, Math.round(o.x), Math.round(o.z)) * Math.PI * 2;
+    let cx = Math.floor(o.x + Math.cos(angle) * o.r * 0.18), cz = Math.floor(o.z + Math.sin(angle) * o.r * 0.18);
+    if (this.islandOf[cx + cz * W] !== island || this.surf[cx + cz * W] <= SEA + 1) {
+      let nearest = null, nearestD = Infinity;
+      for (let x = Math.floor(o.x - o.r * 0.4); x <= o.x + o.r * 0.4; x++) for (let z = Math.floor(o.z - o.r * 0.4); z <= o.z + o.r * 0.4; z++) {
+        const d = Math.hypot(x - cx, z - cz), i = x + z * W;
+        if (d < nearestD && this.islandOf[i] === island && this.surf[i] > SEA + 1) { nearest = [x, z]; nearestD = d; }
+      }
+      if (!nearest) return null;
+      [cx, cz] = nearest;
+    }
+    const center = cx + cz * W, g = Math.max(SEA + 2, this.surf[center]);
+    this.flatten(cx, cz, radius, g, B.GRASS);
+    const spacing = Math.max(7, Math.floor(radius / (major ? 3.5 : village ? 2.5 : 2)));
+    const grid = major ? [-2, -1, 0, 1, 2] : [-1, 0, 1];
+    const roadLimit = Math.max(1, radius - 7);
+    for (let lane = 0; lane <= grid.length; lane++) {
+      const road = Math.round((lane - grid.length / 2) * spacing);
+      for (let k = -roadLimit; k <= roadLimit; k++) {
+        this.supportGround(cx + road, cz + k, g);
+        this.supportGround(cx + k, cz + road, g);
+        this.raw(cx + road, g, cz + k, B.STONE);
+        this.raw(cx + k, g, cz + road, B.STONE);
+      }
+    }
+    for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
+      this.supportGround(cx + dx, cz + dz, g);
+      this.raw(cx + dx, g, cz + dz, B.BRICK);
+    }
+    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) this.raw(cx + dx, g + 1, cz + dz, B.BRICK);
+    this.raw(cx, g + 1, cz, B.BARREL);
+    const lots = [];
+    for (const x of grid) for (const z of grid) {
+      if (x === 0 && z === 0) continue;
+      if (z === 0 && x > 0) continue;
+      if (!major && !village && Math.abs(x) !== 1) continue;
+      lots.push([x, z]);
+    }
+    for (const [x, z] of lots) {
+      let role = 'house';
+      if (major && x === -1 && z === 0) role = 'inn';
+      else if (major && x === 0 && z === -1) role = 'chapel';
+      else if (x === 1 && z === 1) role = 'market';
+      else if (x === 0 && z === 1) role = 'warehouse';
+      else if (x === -2 && z === -1) role = 'workshop';
+      const hw = role === 'chapel' || role === 'inn' || role === 'warehouse' ? (major ? 4 : 3) : (major ? 3 : 2);
+      const hd = role === 'chapel' || role === 'inn' || role === 'warehouse' ? (major ? 4 : 3) : (major ? 3 : 2);
+      this.villageHouse(cx + x * spacing, cz + z * spacing, g, hw, hd, role);
+    }
+    const stallOffset = Math.max(3, Math.floor(spacing / 3));
+    const stallCorners = [[-stallOffset, -stallOffset], [stallOffset, -stallOffset], [-stallOffset, stallOffset], [stallOffset, stallOffset]];
+    for (let stall = 0; stall < 2; stall++) {
+      const [dx, dz] = stallCorners[(island + stall) % stallCorners.length];
+      const alongX = dx * dz > 0;
+      for (let k = -1; k <= 1; k++) {
+        const x = cx + dx + (alongX ? k : 0), z = cz + dz + (alongX ? 0 : k);
+        this.supportGround(x, z, g);
+        this.raw(x, g, z, B.PLANK);
+        this.raw(x, g + 4, z, B.CLOTH);
+      }
+      for (const k of [-1, 1]) {
+        const x = cx + dx + (alongX ? k : 0), z = cz + dz + (alongX ? 0 : k);
+        for (let y = g + 1; y <= g + 3; y++) this.raw(x, y, z, B.LOG);
+      }
+      this.raw(cx + dx, g + 1, cz + dz, (dx + dz) % 2 ? B.BARREL : B.CRATE);
+    }
+    const lights = major ? [-2, -1, 0, 1, 2] : [-1, 0, 1];
+    for (const k of lights) {
+      for (const [x, z] of [[cx + k * spacing, cz - radius + 3], [cx + k * spacing, cz + radius - 3], [cx - radius + 3, cz + k * spacing], [cx + radius - 3, cz + k * spacing]]) {
+        this.supportGround(x, z, g + 1);
+        this.raw(x, g + 1, z, B.LOG); this.raw(x, g + 2, z, B.LOG); this.raw(x, g + 3, z, B.LAMP);
+      }
+    }
+    const dx = o.name === 'Brine Haven' ? -1 : 1, dz = 0;
+    let shore = 0;
+    for (let d = 1; d < o.r * 2; d++) {
+      const x = Math.floor(cx + dx * d), z = Math.floor(cz + dz * d);
+      if (!this.inside(x, 0, z) || this.islandOf[x + z * W] !== island || this.surf[x + z * W] <= SEA + 1) { shore = d; break; }
+    }
+    if (!shore) shore = Math.floor(o.r * 1.15);
+    for (let d = 0; d < shore - 1; d++) {
+      const x = Math.floor(cx + dx * d), z = Math.floor(cz + dz * d), y = Math.max(SEA + 1, this.surf[x + z * W]);
+      for (let side = -1; side <= 1; side++) {
+        const px = Math.floor(x - dz * side), pz = Math.floor(z + dx * side);
+        this.raw(px, y, pz, B.STONE);
+      }
+    }
+    const dockX = Math.floor(cx + dx * (shore - 1)), dockZ = Math.floor(cz + dz * (shore - 1));
+    for (let k = 0; k < 18; k++) for (let side = -1; side <= 1; side++) {
+      const x = Math.floor(dockX + dx * k - dz * side), z = Math.floor(dockZ + dz * k + dx * side);
+      this.raw(x, SEA + 1, z, B.PLANK);
+      if (side && k % 4 === 0) {
+        const bottom = this.topSolid(x, z);
+        for (let y = bottom + 1; y < SEA + 1; y++) this.raw(x, y, z, B.LOG);
+      }
+    }
+    this.raw(dockX + Math.round(dx * 16), SEA + 1, dockZ + Math.round(dz * 16), B.CRATE);
+    this.sites.villages.push({ island, name: o.name, x: cx + 0.5, y: g, z: cz + 0.5, tier });
+    const endX = Math.floor(dockX + dx * 18), endZ = Math.floor(dockZ + dz * 18);
+    this.reserved.push({ x0: Math.min(cx - radius - 2, endX - 2), x1: Math.max(cx + radius + 2, endX + 2), z0: Math.min(cz - radius - 2, endZ - 2), z1: Math.max(cz + radius + 2, endZ + 2) });
+  }
+
+  villageHouse(cx, cz, g, hw, hd, role) {
+    const wallH = role === 'chapel' ? 5 : 3;
+    const wall = role === 'chapel' || role === 'warehouse' ? B.WHITEBRICK : B.PLANK;
+    const roof = role === 'chapel' ? B.SLATE : B.WRECKWOOD;
+    for (let dx = -hw - 1; dx <= hw + 1; dx++) for (let dz = -hd - 1; dz <= hd + 1; dz++) {
+      if (Math.abs(dx) === hw + 1 || Math.abs(dz) === hd + 1) {
+        this.supportGround(cx + dx, cz + dz, g - 1);
+        this.raw(cx + dx, g - 1, cz + dz, B.STONE);
+      }
+    }
+    for (let dx = -hw; dx <= hw; dx++) for (let dz = -hd; dz <= hd; dz++) {
+      const edge = Math.abs(dx) === hw || Math.abs(dz) === hd;
+      this.supportGround(cx + dx, cz + dz, g);
+      this.raw(cx + dx, g, cz + dz, edge ? B.BRICK : B.PLANK);
+      for (let y = g + 1; y <= g + wallH; y++) {
+        if (!edge || (dz === hd && dx === 0 && y <= g + 2)) continue;
+        const window = y === g + 2 && ((Math.abs(dx) === hw && Math.abs(dz) === 1) || (Math.abs(dz) === hd && Math.abs(dx) === 2 && Math.abs(dx) < hw));
+        if (!window) this.raw(cx + dx, y, cz + dz, wall);
+      }
+    }
+    for (const [dx, dz] of [[-hw, -hd], [-hw, hd], [hw, -hd], [hw, hd]]) {
+      for (let y = g + 1; y <= g + wallH; y++) this.raw(cx + dx, y, cz + dz, B.LOG);
+    }
+    const windows = [
+      ...[-1, 1].flatMap((dz) => [[-hw, dz], [hw, dz]]),
+      ...[-2, 2].filter((dx) => Math.abs(dx) < hw).flatMap((dx) => [[dx, -hd], [dx, hd]]),
+    ];
+    for (const [dx, dz] of windows) {
+      this.raw(cx + dx, g + 1, cz + dz, B.WRECKWOOD);
+      this.raw(cx + dx, g + 3, cz + dz, B.WRECKWOOD);
+    }
+    for (const dx of [-1, 1]) for (let y = g + 1; y <= g + wallH; y++) this.raw(cx + dx, y, cz + hd, B.WRECKWOOD);
+    for (let dx = -1; dx <= 1; dx++) this.raw(cx + dx, g + wallH, cz + hd, B.WRECKWOOD);
+    for (const sx of [-1, 1]) for (let y = g + 1; y < g + wallH; y++) this.raw(cx + sx * hw, y, cz, B.WRECKWOOD);
+    for (let y = g + 1; y < g + wallH; y++) this.raw(cx, y, cz - hd, B.WRECKWOOD);
+    for (let dx = -hw; dx <= hw; dx++) for (let dz = -hd; dz <= hd; dz++) {
+      if (Math.abs(dx) === hw || Math.abs(dz) === hd) this.raw(cx + dx, g + wallH, cz + dz, B.LOG);
+    }
+    const rise = hd + 1;
+    for (let dz = -rise; dz <= rise; dz++) {
+      const y = g + wallH + rise - Math.abs(dz);
+      for (let dx = -hw - 1; dx <= hw + 1; dx++) {
+        this.raw(cx + dx, y - 1, cz + dz, roof);
+        this.raw(cx + dx, y, cz + dz, roof);
+      }
+    }
+    for (let dx = -hw; dx <= hw; dx++) this.raw(cx + dx, g + wallH + rise, cz, B.LOG);
+    for (let dx = -1; dx <= 1; dx++) {
+      this.supportGround(cx + dx, cz + hd + 1, g);
+      this.raw(cx + dx, g, cz + hd + 1, B.PLANK);
+      this.raw(cx + dx, g - 1, cz + hd + 1, B.STONE);
+    }
+    if (role !== 'chapel' && role !== 'warehouse') {
+      const chimneyX = cx + hw - 1, chimneyZ = cz - hd;
+      for (let y = g + wallH + 2; y <= g + wallH + 4; y++) this.raw(chimneyX, y, chimneyZ, B.BRICK);
+    }
+    if (role === 'inn' || role === 'market') {
+      for (const dx of [-2, 2]) for (let y = g + 1; y <= g + 3; y++) this.raw(cx + dx, y, cz + hd + 2, B.LOG);
+      for (let dx = -2; dx <= 2; dx++) this.raw(cx + dx, g + 3, cz + hd + 2, B.CLOTH);
+      this.raw(cx, g + 4, cz + hd + 2, B.LAMP);
+    }
+    if (role === 'inn' || role === 'warehouse' || role === 'workshop') {
+      this.raw(cx - hw - 1, g, cz + hd - 1, role === 'inn' ? B.BARREL : B.CRATE);
+      this.raw(cx + hw + 1, g, cz + hd - 1, role === 'workshop' ? B.KEG : B.BARREL);
+    }
+    if (role === 'chapel') {
+      for (let y = g + wallH + rise + 1; y <= g + wallH + rise + 3; y++) this.raw(cx, y, cz - 1, B.WHITEBRICK);
+      this.raw(cx, g + wallH + rise + 4, cz - 1, B.LAMP);
+    }
+    this.raw(cx, g + 2, cz, B.LAMP);
+  }
+
   buildLighthouse(i) {
     const o = this.islands[i];
     let lx = Math.round(o.x), lz = Math.round(o.z);
@@ -308,6 +576,7 @@ export class World {
     lx = best.x; lz = best.z;
     const g = Math.max(SEA + 2, Math.min(SEA + 6, best.s));
     this.flatten(lx + 3, lz, 7, g, B.GRASS);
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) this.supportGround(lx + dx, lz + dz, g);
     const top = g + 13;
     for (let y = g; y < top; y++) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
       if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
@@ -323,12 +592,14 @@ export class World {
     this.raw(lx, top + 4, lz, B.SLATE);
     // keeper's hut
     const hx = lx + 6, hz = lz - 1;
+    for (let dx = 0; dx < 4; dx++) for (let dz = 0; dz < 4; dz++) this.supportGround(hx + dx, hz + dz, g);
     for (let dx = 0; dx < 4; dx++) for (let dz = 0; dz < 4; dz++) for (let y = g; y < g + 3; y++) {
       const wall = dx === 0 || dx === 3 || dz === 0 || dz === 3;
       this.raw(hx + dx, y, hz + dz, wall ? B.PLANK : B.AIR);
     }
     for (let y = g; y < g + 2; y++) this.raw(hx, y, hz + 2, B.AIR);
     for (let dx = -1; dx < 5; dx++) for (let dz = -1; dz < 5; dz++) this.raw(hx + dx, g + 3, hz + dz, B.SLATE);
+    this.raw(hx, g + 2, hz + 1, B.LOG);
     this.raw(hx - 1, g + 2, hz + 1, B.LAMP);
     this.sites.lighthouse = { x: lx + 0.5, y: top + 1.5, z: lz + 0.5, base: g };
     this.sites.tallow = { x: lx + 4.5, y: g, z: lz + 1.5 };
@@ -354,7 +625,7 @@ export class World {
     const put = (x, y, z, id) => { if (record) this.set(x, y, z, id); else this.raw(x, y, z, id); };
     for (let x = cx - 5; x <= cx + 5; x++) for (let z = cz - 5; z <= cz + 5; z++) {
       for (let y = g; y < g + 8; y++) if (this.get(x, y, z) !== B.AIR) put(x, y, z, B.AIR);
-      if (!this.solid(x, g - 1, z)) put(x, g - 1, z, B.DIRT);
+      this.supportGround(x, z, g, B.DIRT, B.LOG, record);
     }
     for (let k = -4; k <= 4; k++) for (const [x, z] of [[cx + k, cz - 4], [cx + k, cz + 4], [cx - 4, cz + k], [cx + 4, cz + k]]) {
       if (rnd() < 0.3 || (Math.abs(k) < 1 && (x === cx || z === cz))) continue;
@@ -431,16 +702,39 @@ export class World {
     }
   }
   oak(x, s, z, rnd) {
-    const h = 4 + Math.floor(rnd() * 2);
+    const h = 7 + Math.floor(rnd() * 3);
+    // Keep the old generator's draw count so later island details remain stable.
+    for (let i = 0; i < 12; i++) rnd();
     for (let y = s; y < s + h; y++) this.raw(x, y, z, B.LOG);
     const top = s + h;
-    for (let dy = -2; dy <= 1; dy++) {
-      const rad = dy <= -1 ? 2 : 1;
-      for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
-        if (Math.abs(dx) === rad && Math.abs(dz) === rad && (dy === 1 || rnd() < 0.5)) continue;
-        this.rawIfAir(x + dx, top + dy, z + dz, B.LEAVES);
+    const arms = [];
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    for (const [i, [dx, dz]] of dirs.entries()) {
+      const branchY = s + h - 3 + (hash3(x + i, s, z - i) > 0.5 ? 1 : 0);
+      const len = 2 + Math.floor(hash3(x - i, branchY, z + i) * 2);
+      let bx = x, bz = z;
+      for (let step = 1; step <= len; step++) {
+        const nx = bx + dx, nz = bz + dz, id = this.get(nx, branchY, nz);
+        if (id && !WOODY[id]) break;
+        if (id === B.AIR) this.raw(nx, branchY, nz, B.LOG);
+        bx = nx; bz = nz;
+        if (id) break;
+      }
+      if (bx !== x || bz !== z) arms.push([bx, branchY, bz]);
+    }
+    const crown = (cx, cy, cz, rx, ry, rz) => {
+      for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++) {
+        for (let dx = -Math.ceil(rx); dx <= Math.ceil(rx); dx++) for (let dz = -Math.ceil(rz); dz <= Math.ceil(rz); dz++) {
+          const d = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) + (dz * dz) / (rz * rz);
+          const edge = (hash3(cx + dx, cy + dy, cz + dz) - 0.5) * 0.3;
+          if (d > 1 + edge || (d > 0.82 && hash3(cx + dx * 3, cy + dy * 3, cz + dz * 3) < 0.035)) continue;
+          const leaf = hash3(cx + dx * 5, cy + dy * 5, cz + dz * 5) > 0.78 ? B.JLEAVES : B.LEAVES;
+          this.rawIfAir(cx + dx, cy + dy, cz + dz, leaf);
+        }
       }
     }
+    crown(x, top - 1, z, 2.6, 2.35, 2.6);
+    for (const [ax, ay, az] of arms) crown(ax, top - 2 + (ay - (top - 3)), az, 1.55, 1.45, 1.55);
   }
   palm(x, s, z, rnd) {
     const h = 5 + Math.floor(rnd() * 3);
@@ -454,14 +748,21 @@ export class World {
     const ty = s + h;
     this.raw(tx, ty, tz, B.FROND);
     for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      this.rawIfAir(tx + ax, ty, tz + az, B.FROND);
-      this.rawIfAir(tx + 2 * ax, ty, tz + 2 * az, B.FROND);
-      this.rawIfAir(tx + 3 * ax, ty - 1, tz + 3 * az, B.FROND);
+      let connected = true;
+      for (const [step, dy] of [[1, 0], [2, 0], [3, -1]]) {
+        const fx = tx + step * ax, fy = ty + dy, fz = tz + step * az;
+        if (!connected || this.get(fx, fy, fz) !== B.AIR) { connected = false; continue; }
+        this.raw(fx, fy, fz, B.FROND);
+      }
       if (rnd() < 0.6) this.rawIfAir(tx + ax, ty - 1, tz + az, B.COCONUT);
     }
     for (const [ax, az] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      this.rawIfAir(tx + ax, ty, tz + az, B.FROND);
-      this.rawIfAir(tx + 2 * ax, ty - 1, tz + 2 * az, B.FROND);
+      let connected = true;
+      for (const [step, dy] of [[1, 0], [2, -1]]) {
+        const fx = tx + step * ax, fy = ty + dy, fz = tz + step * az;
+        if (!connected || this.get(fx, fy, fz) !== B.AIR) { connected = false; continue; }
+        this.raw(fx, fy, fz, B.FROND);
+      }
     }
   }
   boulder(x, s, z, rnd, id) {
@@ -483,9 +784,12 @@ export class World {
     }
     for (let i = -3; i <= 3; i++) {
       const x = cx + i * 2;
-      const g = this.topSolid(x, cz) + 1;
       const R = 5.4 - Math.abs(i) * 0.7;
-      for (let a = 0.1; a < Math.PI - 0.08; a += 0.08) this.rawIfAir(x, g + Math.round(Math.sin(a) * R * 1.15), cz + Math.round(Math.cos(a) * R), B.BONE);
+      for (let a = 0.1; a < Math.PI - 0.08; a += 0.08) {
+        const z = cz + Math.round(Math.cos(a) * R), ground = this.surf[x + z * W];
+        const rise = Math.max(0, Math.round(Math.sin(a) * R * 1.15) - 1);
+        this.rawIfAir(x, ground + rise, z, B.BONE);
+      }
     }
     const hx = cx + 10, g = this.topSolid(hx, cz) + 1;
     for (let dx = 0; dx < 4; dx++) for (let dy = 0; dy < 3; dy++) for (let dz = -1; dz <= 1; dz++) this.raw(hx + dx, g + dy, cz + dz, B.BONE);
@@ -644,7 +948,8 @@ export class World {
         if (!cnt) { const M = fallback; cnt = 1; [t0, t1, t2] = M.top; [s0, s1, s2] = M.side; [d0, d1, d2, d3] = M.det; }
         const ao = Math.min(1.08, Math.max(0.62, 1 - (cnt - 4) * 0.085));
         const vary = 0.88 + 0.24 * (this.nD ? this.nD(px * 0.09, pz * 0.09) : 0.5);
-        const k = (ao * vary) / cnt;
+        const leafShade = leafy ? 0.9 + 0.18 * hash3(Math.floor(px * 1.7), Math.floor(py * 1.7), Math.floor(pz * 1.7)) : 1;
+        const k = (ao * vary * leafShade) / cnt;
         C1.push(t0 * k, t1 * k, t2 * k); C2.push(s0 * k, s1 * k, s2 * k);
         DT.push(d0 / cnt, d1 / cnt, d2 / cnt, d3 / cnt); GL.push(gl / cnt);
       }
@@ -736,7 +1041,7 @@ export class World {
       }
     }
     const [r0, taper, rMin, tile] = BARK[id];
-    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     const stepUp = (xx, yy, zz) => {
       if (g(xx, yy + 1, zz) === id) return [xx, zz];
       if (id === B.PALM) for (const [dx, dz] of nb) if (g(xx + dx, yy + 1, zz + dz) === B.PALM) return [xx + dx, zz + dz];
@@ -771,8 +1076,8 @@ export class World {
       if (!WOODY[nid]) continue;
       any = true;
       const trunk = !!(stepUp(x + dx, y, z + dz) || stepDown(x + dx, y, z + dz));
-      if (trunk) this.cyl(A, cx, cy + 0.2, cz, cx + dx * 0.6, cy - 0.1, cz + dz * 0.6, r0 * 0.55, r0 * 0.7, tile);
-      else if (dx > 0 || dz > 0) this.cyl(A, cx, ly, cz, cx + dx, ly, cz + dz, r0 * 0.85, r0 * 0.85, tile);
+      if (trunk && (dx > 0 || (dx === 0 && dz > 0))) this.cyl(A, cx, cy + 0.2, cz, cx + dx, cy - 0.1, cz + dz, r0 * 0.55, r0 * 0.7, tile);
+      else if (!trunk && (dx > 0 || (dx === 0 && dz > 0))) this.cyl(A, cx, ly, cz, cx + dx, ly, cz + dz, r0 * 0.85, r0 * 0.85, tile);
     }
     if (!any) this.cyl(A, cx - 0.5, ly, cz, cx + 0.5, ly, cz, r0 * 0.85, r0 * 0.8, tile);
   }
@@ -809,31 +1114,70 @@ export class World {
       F.n += (segs + 1) * 2;
     }
   }
-  // a crafted block: six faces (the hidden ones skipped), each with its own corner shading
-  emitBlock(A, x, y, z, id, def, h) {
-    const aos = this._aos || (this._aos = [0, 0, 0, 0]);
-    const tint = 0.93 + 0.12 * h;
-    for (let f = 0; f < 6; f++) {
-      const Fc = FACES[f], d = Fc.dir;
-      if (CRISP[this.get(x + d[0], y + d[1], z + d[2])]) continue;
-      let tile = d[1] === 1 ? def.tex[0] : d[1] === -1 ? def.tex[2] : def.tex[1];
-      if (def.front && d[1] === 0) tile = def.front;
-      const offs = AO_OFF[f], uvs = FACE_UV[f];
-      for (let c = 0; c < 4; c++) aos[c] = this.ao(x, y, z, offs[c]);
-      for (let c = 0; c < 4; c++) {
-        const cr = Fc.corners[c];
-        A.pos.push(x + cr[0], y + cr[1], z + cr[2]);
-        A.nor.push(d[0], d[1], d[2]);
-        A.uv.push(uvs[c][0], uvs[c][1]);
-        A.lay.push(tile);
-        const k = AO_CURVE[aos[c]] * tint;
+  emitCoopered(A, x, y, z, def, h, kind) {
+    const profile = kind === B.KEG
+      ? [[0.08, 0.3], [0.19, 0.37], [0.5, 0.39], [0.81, 0.37], [0.92, 0.3]]
+      : [[0.04, 0.32], [0.16, 0.4], [0.5, 0.43], [0.84, 0.4], [0.96, 0.32]];
+    const segments = 18, tint = 0.93 + 0.12 * h, sideTile = def.tex[1];
+    const normalAt = (row, angle) => {
+      const prev = profile[Math.max(0, row - 1)], next = profile[Math.min(profile.length - 1, row + 1)];
+      const slope = (next[1] - prev[1]) / Math.max(0.001, next[0] - prev[0]);
+      const n = [Math.cos(angle), -slope, Math.sin(angle)], length = Math.hypot(n[0], n[1], n[2]);
+      return n.map((v) => v / length);
+    };
+    for (let row = 0; row < profile.length - 1; row++) for (let i = 0; i < segments; i++) {
+      const a0 = i / segments * Math.PI * 2, a1 = (i + 1) / segments * Math.PI * 2;
+      const r0 = profile[row][1], r1 = profile[row + 1][1], y0 = profile[row][0], y1 = profile[row + 1][0], v = A.n;
+      const push = (radius, yy, angle, uvY, rowIndex) => {
+        const nx = Math.cos(angle), nz = Math.sin(angle), n = normalAt(rowIndex, angle);
+        A.pos.push(x + 0.5 + nx * radius, y + yy, z + 0.5 + nz * radius);
+        A.nor.push(n[0], n[1], n[2]); A.uv.push(i / segments + (angle === a1 ? 1 / segments : 0), uvY);
+        A.lay.push(sideTile);
+        const k = tint * (0.92 + 0.08 * Math.max(0, n[1]));
+        A.col.push(k, k, k);
+      };
+      push(r0, y0, a0, y0, row); push(r0, y0, a1, y0, row);
+      push(r1, y1, a0, y1, row + 1); push(r1, y1, a1, y1, row + 1);
+      A.ind.push(v, v + 2, v + 1, v + 1, v + 2, v + 3); A.n += 4;
+    }
+    for (const top of [false, true]) {
+      const row = top ? profile.length - 1 : 0, yy = profile[row][0], radius = profile[row][1], v = A.n, normalY = top ? 1 : -1;
+      A.pos.push(x + 0.5, y + yy, z + 0.5); A.nor.push(0, normalY, 0); A.uv.push(0.5, 0.5); A.lay.push(top ? def.tex[0] : def.tex[2]);
+      const k = tint * (top ? 1 : 0.72); A.col.push(k, k, k);
+      for (let i = 0; i < segments; i++) {
+        const angle = i / segments * Math.PI * 2, nx = Math.cos(angle), nz = Math.sin(angle);
+        A.pos.push(x + 0.5 + nx * radius, y + yy, z + 0.5 + nz * radius);
+        A.nor.push(0, normalY, 0); A.uv.push(0.5 + nx * 0.5, 0.5 + nz * 0.5); A.lay.push(top ? def.tex[0] : def.tex[2]);
         A.col.push(k, k, k);
       }
-      const v = A.n;
-      if (aos[1] + aos[2] > aos[0] + aos[3]) A.ind.push(v, v + 1, v + 3, v, v + 3, v + 2);
-      else A.ind.push(v, v + 1, v + 2, v + 2, v + 1, v + 3);
-      A.n += 4;
+      for (let i = 0; i < segments; i++) {
+        const a = v + 1 + i, b = v + 1 + (i + 1) % segments;
+        if (top) A.ind.push(v, b, a); else A.ind.push(v, a, b);
+      }
+      A.n += segments + 1;
     }
+  }
+  // A crafted block: beveled faces, with smaller isolated forms for storage props.
+  emitBlock(A, x, y, z, id, def, h) {
+    if (id === B.BARREL || id === B.KEG) { this.emitCoopered(A, x, y, z, def, h, id); return; }
+    const tint = 0.93 + 0.12 * h;
+    const layers = new Array(6).fill(null), factors = new Array(6);
+    const inset = id === B.CHEST || id === B.CRATE ? 0.07 : 0;
+    const bounds = [x + inset, y + inset, z + inset, x + 1 - inset, y + 1 - inset, z + 1 - inset];
+    for (let f = 0; f < 6; f++) {
+      const Fc = FACES[f], d = Fc.dir;
+      if (!inset && CRISP[this.get(x + d[0], y + d[1], z + d[2])]) continue;
+      let tile = d[1] === 1 ? def.tex[0] : d[1] === -1 ? def.tex[2] : def.tex[1];
+      if (def.front && d[1] === 0) tile = def.front;
+      layers[f] = tile;
+      factors[f] = AO_OFF[f].map((offset) => AO_CURVE[this.ao(x, y, z, offset)]);
+    }
+    const adjacent = inset ? null : [
+      OPAQUE[this.get(x - 1, y, z)], OPAQUE[this.get(x + 1, y, z)],
+      OPAQUE[this.get(x, y - 1, z)], OPAQUE[this.get(x, y + 1, z)],
+      OPAQUE[this.get(x, y, z - 1)], OPAQUE[this.get(x, y, z + 1)],
+    ];
+    appendRoundedBox(A, ...bounds, layers, tint, inset ? 0.15 : 0.18, factors, FACE_UV, adjacent);
   }
   hard(x, y, z) { return HARD[this.get(x, y, z)] === 1; }
   // What a body standing at (x, z) with feet near y rests on: the smooth ground or the top of a block.
@@ -1180,7 +1524,7 @@ export class World {
         const r = WS * (R[type][0] + rnd() * R[type][1]);
         const x = 22 * WS + r + rnd() * (LEGACY_W - 44 * WS - 2 * r), z = 22 * WS + r + rnd() * (LEGACY_D - 44 * WS - 2 * r);
         if (tries < 6000 && x < OW + 4 && z < OW + 4) continue;
-        if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 15 * WS)) continue;
+        if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < (o.placementR ?? o.r) + r + 15 * WS)) continue;
         const o = { name, x, z, r, peak: PS * (PEAK[type][0] + rnd() * PEAK[type][1]), type };
         this.islands.push(o); added.push(o);
         break;
@@ -1253,7 +1597,7 @@ export class World {
       const s = Math.min(H - 8, Math.floor(sh.h));
       const ci = x + z * W;
       if (s <= this.surf[ci]) continue;
-      if (this.islandOf[ci] >= 0 && this.islandOf[ci] !== i && (o.late || this.surf[ci] > SEA - 2)) continue;
+      if (this.islandOf[ci] >= 0 && this.islandOf[ci] !== i && (this.surf[ci] > SEA - 2 || (o.late && !o.extended))) continue;
       const dn = this.nD(x * 0.15, z * 0.15);
       let top = B.SAND, sub = B.SAND, deep = B.STONE;
       if (o.type === 'volcano') {
@@ -1506,7 +1850,7 @@ export class World {
       ['Tern Shoals', 'twin', 12, 2, 4, 2], ['Cutlass Point', 'rock', 10, 2, 11, 3]];
     const added = [];
     const clear = (x, z, r) => {
-      if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < (o.r + r) * 1.2 + 18 * WS)) return false;
+      if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < ((o.placementR ?? o.r) + r) * 1.2 + 18 * WS)) return false;
       for (const w of this.sites.wrecks) if (Math.hypot(w.x - x, w.z - z) < r * 1.9 + 8 * WS) return false;
       for (let k = 0; k < 32; k++) {
         const a = (k / 32) * Math.PI * 2, d = r * (k % 2 ? 0.6 : 1.15);
@@ -1553,6 +1897,44 @@ export class World {
     ];
     const added = [];
     const clear = (x, z, r) => {
+      if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < ((o.placementR ?? o.r) + r) * 1.2 + 18 * WS)) return false;
+      for (const w of this.sites.wrecks) if (Math.hypot(w.x - x, w.z - z) < r * 1.9 + 8 * WS) return false;
+      for (let k = 0; k < 32; k++) {
+        const a = (k / 32) * Math.PI * 2, d = r * (k % 2 ? 0.6 : 1.15);
+        const px = Math.floor(x + Math.cos(a) * d), pz = Math.floor(z + Math.sin(a) * d);
+        if (px < 2 || pz < 2 || px >= W - 2 || pz >= D - 2 || this.surf[px + pz * W] > SEA - 4) return false;
+      }
+      return true;
+    };
+    for (const [name, type, r0, rr, p0, pr] of NEW) {
+      for (let tries = 0; tries < 6000; tries++) {
+        const r = WS * (r0 + rnd() * rr);
+        const x = 24 + r * 1.8 + rnd() * (PREVIOUS_MAP_W - 48 - 3.6 * r), z = 24 + r * 1.8 + rnd() * (PREVIOUS_MAP_W - 48 - 3.6 * r);
+        if (!clear(x, z, r)) continue;
+        const o = { name, x, z, r, peak: PS * (p0 + rnd() * pr), type, late: true, frontier: true };
+        if (type === 'cove') o.mouth = rnd() * Math.PI * 2;
+        if (type === 'twin') o.axis = rnd() * Math.PI;
+        this.islands.push(o); added.push(o);
+        break;
+      }
+    }
+    for (const o of added) this.terrainFor(o, this.islands.indexOf(o));
+    for (const o of added) {
+      if (o.r >= 42 && !['volcano', 'atoll', 'sandbar', 'twin'].includes(o.type)) this.buildVillage(o, o.r >= 48 ? 'village' : 'hamlet');
+    }
+    for (const o of added) this.decorateIsland(o, this.islands.indexOf(o), rnd);
+    for (const o of added) this.plantArea(o, rnd);
+  }
+  extendedIslands() {
+    const rnd = mulberry32(this.seed * 41 + 23);
+    const NEW = [
+      ['Mariner’s Rest', 'forest', 17, 7, 8, 4], ['Copperleaf Haven', 'jungle', 17, 7, 9, 4],
+      ['Sable Harbor', 'palm', 16, 7, 5, 3], ['Kingsport Isle', 'forest', 18, 7, 10, 4],
+      ['Morrow’s Green', 'jungle', 17, 7, 8, 4], ['Lanternfall', 'cove', 16, 7, 9, 4],
+      ['Crown Harbor', 'palm', 18, 7, 6, 3], ['Stonewake Isle', 'rock', 18, 7, 13, 5],
+    ];
+    const added = [];
+    const clear = (x, z, r) => {
       if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < (o.r + r) * 1.2 + 18 * WS)) return false;
       for (const w of this.sites.wrecks) if (Math.hypot(w.x - x, w.z - z) < r * 1.9 + 8 * WS) return false;
       for (let k = 0; k < 32; k++) {
@@ -1567,14 +1949,13 @@ export class World {
         const r = WS * (r0 + rnd() * rr);
         const x = 24 + r * 1.8 + rnd() * (W - 48 - 3.6 * r), z = 24 + r * 1.8 + rnd() * (D - 48 - 3.6 * r);
         if (!clear(x, z, r)) continue;
-        const o = { name, x, z, r, peak: PS * (p0 + rnd() * pr), type, late: true, frontier: true };
-        if (type === 'cove') o.mouth = rnd() * Math.PI * 2;
-        if (type === 'twin') o.axis = rnd() * Math.PI;
+        const o = { name, x, z, r, peak: PS * (p0 + rnd() * pr), type, late: true, extended: true };
         this.islands.push(o); added.push(o);
         break;
       }
     }
     for (const o of added) this.terrainFor(o, this.islands.indexOf(o));
+    for (let i = 0; i < added.length; i++) this.buildVillage(added[i], i < 3 ? 'major' : 'village');
     for (const o of added) this.decorateIsland(o, this.islands.indexOf(o), rnd);
     for (const o of added) this.plantArea(o, rnd);
   }
@@ -1589,7 +1970,7 @@ export class World {
     for (let dx = -9; dx <= 9; dx++) for (let dz = -9; dz <= 9; dz++) {
       const x = cx + dx, z = cz + dz;
       for (let y = g; y < g + 9; y++) { const id = this.get(x, y, z); if (id && id !== B.LOG) this.raw(x, y, z, B.AIR); }
-      for (let y = g - 4; y < g; y++) if (!this.solid(x, y, z)) this.raw(x, y, z, y === g - 1 ? (Math.abs(dx) <= 6 && Math.abs(dz) <= 6 ? B.STONE : B.GRASS) : B.DIRT);
+      for (let y = FLOOR; y < g; y++) if (!this.solid(x, y, z)) this.raw(x, y, z, y === g - 1 ? (Math.abs(dx) <= 6 && Math.abs(dz) <= 6 ? B.STONE : B.GRASS) : B.DIRT);
       this.surf[x + z * W] = Math.max(this.surf[x + z * W], g);
       this.islandOf[x + z * W] = i;
     }
@@ -1664,7 +2045,10 @@ export class World {
       if (!ok) continue;
       for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
         for (let y = g; y < g + 7; y++) { const id = this.get(x + dx, y, z + dz); if (id && id !== B.LOG && id !== B.JLOG) this.raw(x + dx, y, z + dz, B.AIR); }
-        if (Math.abs(dx) <= 3 && Math.abs(dz) <= 3) this.raw(x + dx, g - 1, z + dz, rnd() < 0.6 ? B.MOSSBRICK : B.BRICK);
+        if (Math.abs(dx) <= 3 && Math.abs(dz) <= 3) {
+          this.supportGround(x + dx, z + dz, g - 1, B.MOSSBRICK, B.MOSSBRICK);
+          this.raw(x + dx, g - 1, z + dz, rnd() < 0.6 ? B.MOSSBRICK : B.BRICK);
+        }
       }
       for (const [px, pz] of [[-3, -3], [3, -3], [-3, 3], [3, 3], [0, -3], [0, 3]]) {
         const h = 1 + Math.floor(rnd() * 4);

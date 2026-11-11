@@ -12,14 +12,14 @@ import * as THREE from 'three';
 import { W, D, H, FLOOR, SEA, B, BLOCKS, ITEMS, LOOKS, clamp, wrapAngle } from './config.js';
 import { Avatar } from './character.js';
 import { PARROT_COLORS } from './models.js';
-import { Ship, fireBroadside, fireGun, GUNS, SHIP_NAMES } from './ship.js';
+import { Ship, fireBroadside, fireGun, GUNS, PLAYER_VESSELS, SHIP_NAMES } from './ship.js';
 import { FLEET_KINDS } from './fleet.js';
 import { Skeleton } from './enemies.js';
 import { KrakenPuppet } from './kraken.js';
 import { isGun } from './guns.js';
 import { packEdits, unpackEdits } from './save.js';
 
-const PROTO = 4;                      // 0.6.12: expanded underground world, so older pages keep to themselves
+const PROTO = 5;                      // 0.6.22: player vessel designs are part of ship state
 const SEND = 0.1;                     // seconds between presence updates
 const BUDGET = 3800;                  // bytes one presence object may reach (the room allows 4096)
 const MAX_CREW = 3;
@@ -710,7 +710,7 @@ export class Net {
     const mk = tr.marker;
     o.ob = [clean(tr.title, 60), clean(tr.text, 160), mk ? r1(mk.x) : null, mk ? r1(mk.z) : null, mk ? ICONS.indexOf(mk.icon) : -1];
     o.mk = G.quests.markers().slice(0, 5).map((m) => [ICONS.indexOf(m.icon), r1(m.x), r1(m.z), m.tracked ? 1 : 0, m.r ? r1(m.r) : 0]);
-    if (s) o.sh = [s.nid, r2(s.pos.x), r2(s.pos.z), r3(s.heading), r2(s.speed), r2(s.sailLvl), r2(s.rudder), Math.round(s.hp), s.maxHp, s.sinking ? 1 : 0, s.guns, s.reverse ? 1 : 0];
+    if (s) o.sh = [s.nid, r2(s.pos.x), r2(s.pos.z), r3(s.heading), r2(s.speed), r2(s.sailLvl), r2(s.rudder), Math.round(s.hp), s.maxHp, s.sinking ? 1 : 0, s.guns, s.reverse ? 1 : 0, Math.max(0, PLAYER_VESSELS.findIndex((v) => v.id === s.design.id))];
     o.hl = this.helmPeer || (P.mode === 'helm' && P.alive ? this.me : null);
     o.hs = G.hollows.slice(0, 7).map((h) => [h.nid, h.variant === 'flagship' ? 1 : 0, r2(h.pos.x), r2(h.pos.z), r3(h.heading), r2(h.speed), r2(h.sailLvl), r2(h.rudder), Math.round(h.hp), h.maxHp, h.sinking ? 1 : 0, Math.max(0, FLEET_KINDS.indexOf(h.kind)), SHIP_NAMES[h.kind] ? Math.max(0, SHIP_NAMES[h.kind].indexOf(h.name)) : 0, h.taken ? 1 : 0, h.looted ? 1 : 0]);
     {
@@ -965,14 +965,15 @@ export class Net {
   syncSloop(sh, now) {
     const G = this.g, P = G.player;
     let s = G.sloop;
-    if (!Array.isArray(sh) || sh.length < 12 || !sh.slice(0, 9).every(fin)) {
+    if (!Array.isArray(sh) || sh.length < 13 || !sh.slice(0, 9).every(fin) || !fin(sh[12])) {
       if (s && s.remote) { if (P.mode !== 'foot') P.leaveShip(s); G.removeShip(s); }
       return;
     }
     const nid = sh[0], x = num(sh[1], 0, W), z = num(sh[2], 0, D), h = num(sh[3], -1000, 1000);
-    if (!s || !s.remote || s.remote.nid !== nid) {
+    const vessel = PLAYER_VESSELS[int(sh[12], 0, PLAYER_VESSELS.length - 1)];
+    if (!s || !s.remote || s.remote.nid !== nid || s.design.id !== vessel.id) {
       if (s) { if (P.mode !== 'foot') P.leaveShip(s); G.removeShip(s); }
-      s = new Ship(G.scene, 'sloop', { look: this.hostLook || G.look });
+      s = new Ship(G.scene, 'sloop', { look: this.hostLook || G.look, playerVessel: vessel.id });
       s.remote = { nid, x, z, h, speed: 0, sail: 0, rudder: 0, at: now, snap: true, mine: false };
       s.place(x, z, h);
       G.sloop = s;

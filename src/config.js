@@ -1,9 +1,10 @@
 // Shared constants for Brinebound (working title). VERSION below is the one shown on the title screen.
-export const VERSION = '0.6.19';
+export const VERSION = '0.6.34';
 export const WS = 3;                     // world scale: 0.6 made the islands and the sea between them 3x wider (10x the area)
 export const WORLD_Y_SHIFT = 48;         // raise the old world to make room for deeper mines below it
 export const LEGACY_W = 384 * WS, LEGACY_D = 384 * WS; // map dimensions used by 0.6.15 saves and island placement
-export const W = 544 * WS, D = 544 * WS, H = 40 + WORLD_Y_SHIFT; // 0.6.16 doubles the 0.6.15 map area
+export const PREVIOUS_MAP_W = 544 * WS;  // 0.6.16 map width, used to remap old saves and keep its islands in place
+export const W = 608 * WS, D = 608 * WS, H = 40 + WORLD_Y_SHIFT; // 0.6.27 expands the chart while preserving the previous map
 export const OW = 256 * WS;              // the inner map, where the first nine islands are placed
 export const SEA = 12 + WORLD_Y_SHIFT;  // water surface sits at y = SEA
 export const WATER_Y = SEA - 0.12;      // mean height of the animated water plane

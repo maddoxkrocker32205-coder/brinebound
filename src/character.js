@@ -465,15 +465,36 @@ function upperArmParts(L) {
     box(C.leather, [0, -0.25, -0.078], [0.13, 0.022, 0.022], [0, 0, 0], 'leather'),
   ];
 }
-function forearmParts(L) {
-  return [
+function forearmParts(L, withHand = true) {
+  const p = [
     profile(L.coat, [[-0.29, 0.045, 0.052], [-0.25, 0.052, 0.058], [-0.14, 0.06, 0.063], [-0.045, 0.066, 0.069], [0, 0.058, 0.062]], 18),
     capsule(shade(L.coat, 0.72), [0, -0.29, 0], 0.054, 0.025),
     capsule(C.leather, [0, -0.32, 0], 0.057, 0.03, [1, 1, 1], [0, 0, 0], 'leather'),
+    box(C.steel, [0, -0.35, -0.045], [0.058, 0.035, 0.012], [0, 0, 0], 'metal'),
+  ];
+  if (withHand) p.push(
     sphere(C.glove, [0, -0.38, -0.004], [0.049, 0.067, 0.043], [0, 0, 0], 'leather'),
     ...[-1, 0, 1].map((x) => capsule(C.glove, [x * 0.026, -0.405, -0.026], 0.012, 0.045, [1, 1, 0.8], [0, 0, x * 0.12], 'leather')),
     capsule(C.glove, [-0.05, -0.36, -0.025], 0.014, 0.048, [1, 1, 0.8], [0, 0, 0.55], 'leather'),
-    box(C.steel, [0, -0.35, -0.045], [0.058, 0.035, 0.012], [0, 0, 0], 'metal'),
+  );
+  return p;
+}
+
+function viewGripParts(L) {
+  const nail = shade(L.skin, 1.18), knuckle = shade(L.skin, 1.06);
+  return [
+    sphere(L.skin, [0, 0.005, 0.105], [0.071, 0.056, 0.092], [0, 0, 0], 'skin'),
+    ...[-1.5, -0.5, 0.5, 1.5].flatMap((i) => {
+      const x = i * 0.032;
+      return [
+        sphere(knuckle, [x, -0.022, 0.12], [0.023, 0.03, 0.046], [0, 0, 0], 'skin'),
+        sphere(L.skin, [x * 0.92, -0.019, 0.16], [0.018, 0.024, 0.034], [0, 0, 0], 'skin'),
+        sphere(nail, [x * 0.92, -0.041, 0.174], [0.009, 0.003, 0.011], [0, 0, 0], 'skin'),
+      ];
+    }),
+    capsule(L.skin, [-0.065, 0.024, 0.13], 0.026, 0.07, [1, 1, 0.85], [0, 0, 0.9], 'skin'),
+    box(C.leather, [0, 0.005, -0.025], [0.13, 0.072, 0.07], [0, 0, 0], 'leather'),
+    ...[-0.045, 0, 0.045].map((x) => box(C.brass, [x, 0.045, 0.12], [0.004, 0.003, 0.045], [0, 0, 0], 'metal')),
   ];
 }
 
@@ -667,13 +688,23 @@ function humanHeadwear(L, head) {
   const irisMaterial = new THREE.MeshStandardMaterial({ color: '#563a25', roughness: 0.42 });
   const pupilMaterial = new THREE.MeshStandardMaterial({ color: '#171311', roughness: 0.28 });
   const glintMaterial = new THREE.MeshBasicMaterial({ color: '#eee8dc' });
+  const skinMaterial = new THREE.MeshStandardMaterial({ color: L.skin, roughness: 0.82, map: SKIN_MAP });
+  const eyelids = [];
   for (const side of [-1, 1]) {
     const sclera = addMesh(head, new THREE.SphereGeometry(1, 24, 16), scleraMaterial, [side * 0.036, 0.054, 0.079], [0.0085, 0.006, 0.002]);
     const iris = addMesh(head, new THREE.SphereGeometry(1, 20, 14), irisMaterial, [side * 0.036, 0.054, 0.0808], [0.0052, 0.0062, 0.0018]);
     const pupil = addMesh(head, new THREE.SphereGeometry(1, 16, 12), pupilMaterial, [side * 0.036, 0.054, 0.0823], [0.0022, 0.0034, 0.001]);
     const glint = addMesh(head, new THREE.SphereGeometry(1, 10, 8), glintMaterial, [side * 0.036 - 0.0012, 0.056, 0.0831], [0.0007, 0.0007, 0.0004]);
-    for (const eye of [sclera, iris, pupil, glint]) eye.castShadow = false;
+    const brow = addMesh(head, new THREE.SphereGeometry(1, 16, 10), hairMaterial, [side * 0.036, 0.063, 0.078], [0.010, 0.0022, 0.0022]);
+    brow.rotation.z = side * -0.08;
+    const lid = addMesh(head, new THREE.SphereGeometry(1, 20, 12), skinMaterial, [side * 0.036, 0.054, 0.084], [0.008, 0.0002, 0.0024]);
+    lid.userData.openScale = lid.scale.y;
+    lid.userData.closedScale = 0.0064;
+    eyelids.push(lid);
+    for (const eye of [sclera, iris, pupil, glint, brow, lid]) eye.castShadow = false;
   }
+  addMesh(head, new THREE.SphereGeometry(1, 20, 14), skinMaterial, [0, 0.035, 0.083], [0.0065, 0.014, 0.007]);
+  addMesh(head, new THREE.SphereGeometry(1, 20, 14), skinMaterial, [0, 0.025, 0.088], [0.009, 0.007, 0.008]);
 
   if (L.patch) {
     const patchMaterial = new THREE.MeshStandardMaterial({ color: '#181715', roughness: 0.95 });
@@ -703,6 +734,7 @@ function humanHeadwear(L, head) {
     addMesh(head, new THREE.BoxGeometry(0.065, 0.046, 0.015), new THREE.MeshStandardMaterial({ color: C.brass, metalness: 0.55, roughness: 0.45 }), [0, 0.155, 0.095]);
     brim.userData.sharedHumanModel = false; crown.userData.sharedHumanModel = false;
   }
+  return eyelids;
 }
 
 export class Avatar {
@@ -710,7 +742,7 @@ export class Avatar {
     this.extra = extra;
     this.root = new THREE.Group();
     this.mat = voxelMaterial();
-    this.t = Math.random() * 10; this.phase = 0; this.swing = 0; this.item = null;
+    this.t = Math.random() * 10; this.blinkOffset = Math.random() * 4.5; this.phase = 0; this.swing = 0; this.item = null;
     this.setLook(look);
     HUMAN_MODEL_READY.then((source) => {
       if (!source) return;
@@ -725,6 +757,7 @@ export class Avatar {
     this.root.clear();
     this.humanRig = null;
     this.humanBones = null;
+    this.humanFace = null;
     if (HUMAN_SOURCE) {
       this.buildHuman(L);
       return;
@@ -773,7 +806,7 @@ export class Avatar {
     this.humanRig.add(gear);
     this.humanRig.updateMatrixWorld(true);
     this.humanBones.pelvis.attach(gear);
-    humanHeadwear(L, this.humanBones.head);
+    this.humanFace = humanHeadwear(L, this.humanBones.head);
     this.hand = new THREE.Group();
     this.hand.rotation.x = Math.PI / 2;
     this.humanBones.hand_r.add(this.hand);
@@ -829,10 +862,14 @@ export class Avatar {
     set('upperarm_l', armL, 0, -0.65 + armLz);
     set('upperarm_r', armR, 0, 0.65 + armRz);
     set('lowerarm_l', elbowL); set('lowerarm_r', elbowR);
-    set('spine_01', -torsoX * 0.25, torsoY * 0.25, torsoZ * 0.25);
-    set('spine_02', -torsoX * 0.35, torsoY * 0.35, torsoZ * 0.35);
+    const breathing = state === 'idle' || state === 'helm' ? Math.sin(this.t * 1.6) * 0.012 : 0;
+    set('spine_01', -torsoX * 0.25 - breathing, torsoY * 0.25, torsoZ * 0.25);
+    set('spine_02', -torsoX * 0.35 - breathing * 0.6, torsoY * 0.35, torsoZ * 0.35);
     set('spine_03', -torsoX * 0.3, torsoY * 0.3, torsoZ * 0.3);
-    set('head', headX + (o.look || 0), headY, 0);
+    set('head', headX + (o.look || 0), headY + (state === 'idle' ? Math.sin(this.t * 0.55) * 0.012 : 0), 0);
+    const blinkPhase = (this.t + this.blinkOffset) % 4.5;
+    const blink = state !== 'dead' && blinkPhase < 0.14 ? Math.sin(Math.PI * blinkPhase / 0.14) : 0;
+    for (const lid of this.humanFace || []) lid.scale.y = lid.userData.openScale + (lid.userData.closedScale - lid.userData.openScale) * blink;
     if (this.petGroup) {
       const busy = state === 'run' || state === 'air' || o.swing > 0;
       this.petGroup.position.y = 1.4 + (busy ? 0.06 + Math.abs(Math.sin(this.t * 22)) * 0.05 : Math.max(0, Math.sin(this.t * 2.3)) * 0.012);
@@ -960,29 +997,32 @@ export class ViewArm {
   setLook(look) {
     const L = resolve(look);
     this.group.clear();
-    const forearm = forearmParts(L);
+    const forearm = forearmParts(L, false);
     for (const p of forearm) p.geometry.translate(0, -0.31, 0);
     this.arm = new THREE.Group();
     mesh(this.arm, [...upperArmParts(L), ...forearm]);
     this.arm.scale.setScalar(1.25);
     this.group.add(this.arm);
     this.hand = new THREE.Group(); this.hand.position.set(0, -0.72, -0.03); this.group.add(this.hand);
+    mesh(this.hand, viewGripParts(L));
+    this.tool = new THREE.Group(); this.tool.scale.setScalar(0.62); this.hand.add(this.tool);
     this.item = undefined;
   }
   hold(item, blockMesh) {
     if (item === this.item) return;
     this.item = item;
-    this.hand.clear();
+    this.tool.clear();
+    this.hand.rotation.set(0, 0, 0);
     const g = itemGeo(item);
     if (g) {
       this.hand.rotation.x = -Math.PI / 2;
       const m = new THREE.Mesh(g, this.mat);
       m.position.set(0, isGun(item) ? 0.08 : 0, item === 'cutlass' ? -0.08 : isGun(item) ? -0.05 : 0);
       m.scale.setScalar(item === 'musket' ? 2.5 : item === 'pistol' ? 2 : item === 'blunderbuss' ? 1.7 : item === 'cutlass' ? 2.3 : 1.8);
-      this.hand.add(m);
+      this.tool.add(m);
     } else {
-      this.hand.rotation.set(0, 0, 0);
-      if (blockMesh) { blockMesh.position.set(0, 0, -0.05); this.hand.add(blockMesh); }
+      if (item) this.hand.rotation.x = -Math.PI / 2;
+      if (blockMesh) { blockMesh.position.set(0, 0, -0.05); this.tool.add(blockMesh); }
     }
   }
 }

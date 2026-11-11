@@ -120,6 +120,13 @@ export class Input {
   press(a) { this.pressed.add(a); }
   hold(a, on) { if (on) this.btnHeld.add(a); else this.btnHeld.delete(a); }
   setGamepadHold(a, on) { if (on) this.gamepadHeld.add(a); else this.gamepadHeld.delete(a); }
+  promptControl(action) {
+    if (this.gamepadId !== null) {
+      return { use: '□', jump: '×', crouch: '○', view: '△', attack: 'R2', place: 'L2', menu: 'Options' }[action] || '×';
+    }
+    if (this.g.isTouch) return 'Tap';
+    return { use: 'F', jump: 'Space', crouch: 'C', view: 'V', attack: 'Left click', place: 'Right click', menu: 'P' }[action] || 'F';
+  }
   deadzone(value, zone = 0.16) {
     const magnitude = Math.abs(value);
     if (magnitude <= zone) return 0;
@@ -209,14 +216,18 @@ export class Input {
       this.gamepadToastPending = false;
     }
     if (play) {
+      const step = this.g.hints && this.g.hints.tutorialStep;
+      const guide = Number.isInteger(step) && step >= 0 && step < 6;
       if (justPressed(1)) this.press('crouch');
       if (justPressed(2)) this.press('use');
       if (justPressed(3)) this.press('view');
       if (justPressed(4) || justPressed(14)) this.press('prev');
-      if (justPressed(5) || justPressed(15)) this.press('next');
-      if (justPressed(6)) this.press('place');
+      if (justPressed(5)) this.press('next');
+      if (justPressed(15)) { if (guide) this.g.advanceTutorial(); else this.press('next'); }
+      if (justPressed(6)) this.press(this.g.player && this.g.player.mode === 'helm' ? 'port' : 'place');
+      if (justPressed(7) && this.g.player && this.g.player.mode === 'helm') this.press('star');
       if (justPressed(8) || justPressed(12)) this.press('map');
-      if (justPressed(13)) this.press('quests');
+      if (justPressed(13)) { if (guide) this.g.skipTutorial(); else this.press('quests'); }
       if (justPressed(9)) this.press('menu');
       if (justPressed(11)) this.press('emote');
       this.lookDX += rx * 1200 * dt;

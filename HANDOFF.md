@@ -1,6 +1,6 @@
 # Brinebound: hand-off guide
 
-Version 0.6.19. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
+Version 0.6.34. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
 
 ## Starter prompt
 
@@ -14,19 +14,20 @@ Brinebound (a working title) is a first-person pirate sandbox that runs in one H
 
 What is in it now:
 
-- A 1632 x 1632 block world (about 1.6 km across, twice the previous map area) of 46 islands: the original 23 plus 23 islands in the Outer Reach, with new chart-and-report expedition side quests from Old Mags and Brother Tallow.
+- A 1824 x 1824 block world (about 1.8 km across) of 54 islands, including eight large additions, with 24 settlements and chart-and-report expedition side quests from Old Mags and Brother Tallow.
 - Mining, chopping (trees fall whole), crafting, and Rust-style building pieces (floors, walls, windows, doorways, stairs, roofs, posts) in wood or stone. Unsupported pieces fall. Debris tumbles, floats and settles.
-- Your own sloop, which you sail from the helm (sail level, rudder, wind), with a walkable deck, a hold with a sea chest, cannons on both sides, a crow's nest, and hull damage you repair with planks. Every ship is about 24 m long, twice the size it was before 0.6, with 3.4 m of headroom in the hold and a crow's nest 19 m up.
+- A player fleet of sloop, cutter, brigantine and frigate hulls, with distinct sailing, durability, gun and turning profiles. Commission and switch boats through Old Mags’ shipyard; upgrades apply across the fleet, and compatible older saves default to the sloop.
 - Ships collide hull to hull: each hull is a chain of circles that follows its shape, so ships can lie alongside each other, glance off coasts and rocks, and take damage when they ram.
-- Other ships: merchantmen, a navy cutter, pirates and ghostly "hollow" ships, each crewed by NPC sailors (helmsman, gunners, deckhands, a lookout with a musket). You can board any ship, fight the crew and loot the strongbox.
+- Other ships: merchantmen and packet ships, navy frigates and cutters, pirate brigs and raiders, plus ghostly hollow ships. Their rigs, speed, turning, durability and broadside strength differ while the shared deck and collision plan stays safe for boarding. Each has NPC sailors (helmsman, gunners, deckhands, a lookout with a musket); you can board any ship, fight the crew and loot its strongbox.
 - Combat: cutlass, flintlock pistol, blunderbuss and musket (lead shot), broadsides, a kraken, hollowmen that rise at night away from lantern light, and skeleton camps.
 - A character creator, first- and third-person cameras, crouching, crawling, sliding, a grappling hook, ledge climbing and emotes.
 - Gold and valuables (goblets, pearls, rubies, idols) that you lose if you die unless you stow them in the sea chest or bank them with Old Mags, who runs the trading post and sells upgrades and supplies.
-- An eight-chapter story, contracts, a map, day and night, storms, weather and wildlife (parrots you can tame, boars, goats, crabs, turtles, fish, dolphins, sharks, whales).
+- An eight-chapter story, a parallel Shipwright’s Wager, and contracts with multiple reputation routes to boat charters; also a map, day and night, storms, weather and wildlife (parrots you can tame, boars, goats, crabs, turtles, fish, dolphins, sharks, whales).
 - A soundtrack of five original tunes, played live by a synthesized band, that follows the action.
 - Three save slots plus an autosave in the browser, and save files you can download and load.
 - Touch controls for phones and tablets, with a compact HUD on small screens (upright or sideways), and quality presets for slower devices.
 - Gamepad controls for standard-layout controllers such as the PS5 DualSense, including twin-stick play and menu navigation.
+- Controller-aware interaction prompts, an optional replayable first-voyage guide, and enhanced procedural sun glints and shallow-water shimmer.
 - Inside the Claude app only: cloud saves and "crew" multiplayer (see Outside Claude below).
 
 ## Run it
@@ -54,23 +55,23 @@ To work on it with live files instead, serve the project folder with any static 
 | `src/main.js` | Entry point. Creates the `Game` and exposes it as `window.__brinebound`. |
 | `src/game.js` | The `Game` class: renderer, scene and camera, the main loop and state machine, player actions (mining, fighting, using things), interactions, ship boarding, loot and banking, the camera, the soundtrack's mood choice, save and load. The biggest file; read only the parts you need. |
 | `src/config.js` | `VERSION`, world constants, blocks (`BLOCKS`, `B`), items (`ITEMS`), recipes (`RECIPES`), the default hotbar, captain looks, small helpers. |
-| `src/world.js` | World generation (islands, caves, forts, ruins, reefs, wrecks), block storage, edits, chunk meshing and visibility, walking and ground queries. |
+| `src/world.js` | World generation (islands, settlements, caves, forts, ruins, reefs, wrecks), block storage, edits, chunk meshing and visibility, walking and ground queries. |
 | `src/surface.js` | Smooth terrain meshes from block data (constrained Surface Nets). |
 | `src/materials.js`, `src/textures.js`, `src/paint.js` | Shaders and materials, the block texture atlas, painted surfaces for crafted blocks, bark and plants. |
-| `src/geo.js`, `src/models.js`, `src/props.js` | Geometry helpers, animal models, placed props (lanterns, barrels, signs). |
-| `src/water.js`, `src/sky.js`, `src/weather.js` | The ocean shader and wave height function (the shader also cuts the sea out of every ship's hull, from `Ocean.setShips`, so holds stay dry), sky and the day/night cycle, storms and rain. |
+| `src/geo.js`, `src/models.js`, `src/props.js` | Rounded-box and ellipsoid geometry helpers, organic procedural animal models, placed props (lanterns, barrels, signs). |
+| `src/water.js`, `src/sky.js`, `src/weather.js` | The ocean shader and wave height function (the shader also cuts the sea out of every ship's hull, from `Ocean.setShips`, so holds stay dry), sun glints, shallow-water shimmer, sky and the day/night cycle, storms and rain. |
 | `src/player.js` | Player movement and physics: walking, sprinting, sliding, crouching, climbing, swimming, standing on moving decks, emotes. |
 | `src/character.js` | Captain and sailor models, poses and animation, held items, the first-person arm, portraits. |
 | `src/assets/human-base-rigged.glb`, `src/assets/ATTRIBUTION.txt` | CC0 human base mesh and its source/license record. The Node and Python builds embed the model in the single-page game. |
 | `src/input.js` | Keyboard, mouse (pointer lock), touch (joystick, look pad, buttons) and standard-layout gamepads such as DualSense. |
-| `src/ship.js` | Ship hulls, deck layout in ship-local coordinates, sailing physics, collisions with land (`groundContact`) and the hull circles other ships hit (`hullCircles`), cannons and broadsides, damage and sinking. The plan is drawn for a ship of size 1 (`SHIP1`, `GUNS1`, `floorAt1`...); every ship is built `SCALE` (2) times bigger, and the hold floor, walkable bounds and bilge shape must stay aligned with the full-size plan the player walks. Sail cloth dimensions are defined by `sailGeo` and the sail's anchor stays aligned with its yard. |
+| `src/ship.js` | Ship designs, detailed hulls, deck layout in ship-local coordinates, sailing physics, waterline hull-footprint collisions with land and other ships, cannons and broadsides, damage and sinking. Classes share the proven hull and walkable-deck plan; rigging and handling vary by class. Every ship is built `SCALE` (2) times bigger, and the hold floor, walkable bounds and bilge shape must stay aligned with the full-size plan the player walks. Sail cloth dimensions are defined by `sailGeo` and the sail's anchor stays aligned with its yard. |
 | `src/fleet.js` | Other ships at sea and their sailing AI, notoriety with the navy. |
 | `src/crews.js` | NPC sailors on other ships: posts, alerts, fighting boarders, the strongbox when the ship is taken. |
 | `src/enemies.js` | Hollowmen and skeleton camps, plus the hollow ships' attack AI. |
 | `src/kraken.js` | The kraken fight. |
 | `src/guns.js` | Pistol, blunderbuss and musket: firing, tracing shots, reloads, tracers and muzzle flashes. |
 | `src/hook.js` | The grappling hook. |
-| `src/build.js`, `src/pieces.js` | The builder's hammer and the snap-together building pieces. |
+| `src/build.js`, `src/pieces.js` | The builder's hammer and the snap-together building pieces; procedural bevels soften their edges. |
 | `src/physics.js` | Debris, falling trees, collapsing structures, floating wreckage. |
 | `src/fx.js` | Particles and cannonballs. |
 | `src/fauna.js`, `src/life.js` | Wildlife and its behaviour; ambient life such as birds and fish. |
@@ -93,12 +94,13 @@ To work on it with live files instead, serve the project folder with any static 
 ## How it fits together
 
 - **Loop and states.** `Game.loop` runs every animation frame. `state` is `'loading'`, `'title'`, `'play'` or `'sheet'` (a menu is open; the world keeps running). `updatePlay` reads input and then `simulate(dt)` advances everything in a fixed order: wind, player, your sloop, other ships and their AI, the kraken, ship collisions, NPC crews, guns, player actions, enemies, projectiles, physics, particles, props, townsfolk, quests, weather, wildlife, chunk remeshing, the camera, the hook, the avatar and view model, timers, ambience and music, the HUD, and the autosave timer.
-- **World.** Blocks live in flat typed arrays, `W x H x D` = 1632 x 88 x 1632 (`WS` = 3 in `config.js` scales the world and the islands), sea level at y = 60. The world has twice the previous map area, 46 islands, and extends about four times deeper underground than before to an unbreakable bedrock floor. Island seabeds now ease down over a broad underwater shelf to the shared bedrock floor, avoiding an abrupt edge where the generated island mesh ends. `world.set(x, y, z, block, edit)` changes a block and marks chunks (16 x 16 columns) dirty; `processDirty` remeshes a few per frame. Terrain renders as smooth surfaces; placed and crafted blocks render as cubes. Player edits are stored separately (`world.edits`) so a save only holds the differences from the generated world. Generation is deterministic from `SEED`; the 0.6.16 loader remaps older 1152-wide save edits into the expanded map and preserves the older island locations.
+- **World.** Blocks live in flat typed arrays, `W x H x D` = 1632 x 88 x 1632 (`WS` = 3 in `config.js` scales the world and the islands), sea level at y = 60. The world has twice the previous map area, 46 islands, and extends about four times deeper underground than before to an unbreakable bedrock floor. Island seabeds now ease down over a broad underwater shelf to the shared bedrock floor, avoiding an abrupt edge where the generated island mesh ends. `world.set(x, y, z, block, edit)` changes a block and marks chunks (16 x 16 columns) dirty; `processDirty` remeshes a few per frame. Terrain renders as smooth surfaces; crafted blocks and building pieces use procedural bevels. Player edits are stored separately (`world.edits`) so a save only holds the differences from the generated world. Generation is deterministic from `SEED`; the 0.6.16 loader remaps older 1152-wide save edits into the expanded map and preserves the older island locations.
 - **Ships.** Each ship has a world position and heading; its deck, hold, stairs, cannons and fittings are in ship-local coordinates (waterline at y = 0, bow towards -z). The plan in `ship.js` is drawn for size 1 and every ship's model is scaled by `ship.size` (`SCALE` = 2). The player walks the plan in metres (`SHIP`, `floorAt`, `ceilingAt`, `deckObstacles`), whose margins for a body are not scaled. NPC sailors ride the scaled model, so they walk the size-1 plan (`SHIP1`, `floorAt1`...) and are shrunk back to human size; `shipToWorld` in `crews.js` converts. When the player stands on a ship, `player.ship` points to it and the player is simulated in that ship's frame (in metres). `Game.shipCollisions` resolves ship against ship; `Ship.physics` handles running aground.
+- **Ship collisions.** `Ship.hullOutline()` transforms the convex waterline profile used by both land-cell overlap tests and ship-to-ship SAT. Keep it aligned with the lofted hull profile when changing the hull shape; the boarding deck remains a separate walkable plan.
 - **NPC crews.** `crews.js` puts sailors on every non-player ship. When someone boards, the ship goes on alert and the crew fights. When all are down the ship is "taken": she stops, and her strongbox can be broken open.
-- **Saves.** A save is a JSON document: `meta` (name, day, time) and `data` (player, inventory, ship, quests, gold, chest, world edits compressed with deflate-raw and base64). Local saves use `localStorage` keys `brinebound-v2-auto` and `brinebound-v2-s1` to `-s3`; settings use `brinebound-settings`. "Continue voyage" opens the newest save and falls back to older ones if it cannot be read.
+- **Saves.** A save is a JSON document: `meta` (name, day, time) and `data` (player, inventory, active ship type and owned vessels, quests, gold, chest, world edits compressed with deflate-raw and base64). Older 0.6 save documents still load and default to an owned sloop. Local saves use `localStorage` keys `brinebound-v2-auto` and `brinebound-v2-s1` to `-s3`; settings use `brinebound-settings`. "Continue voyage" opens the newest save and falls back to older ones if it cannot be read.
 - **Audio.** No audio files. `audio.js` makes the effects (cannons, guns, waves, rain, creaks, gulls). `music.js` holds five tunes written as note strings with chords and a form, a small band (fiddle, tin whistle, concertina, plucked strings, bass, drone, drums, claps) and a scheduler. `Game.musicMood` picks `title`, `port`, `sea`, `night` or `battle`.
-- **Multiplayer.** Only inside the Claude app (see below). The host simulates everything; crew pages send their own position and requests and draw puppets of everything else. `PROTO` in `net.js` must change whenever the shared messages change, so old and new pages do not mix.
+- **Multiplayer.** Only inside the Claude app (see below). The host simulates everything; crew pages send their own position and requests and draw puppets of everything else. The host’s active vessel design is synchronized to the crew. `PROTO` in `net.js` must change whenever the shared messages change, so old and new pages do not mix.
 
 ## Rules the codebase follows
 
@@ -141,9 +143,24 @@ The game was built and published inside the Claude app, which gives the page a `
 
 ## Version history
 
+- **0.6.34:** add an Ultra graphics preset with 4K shadows and longer view distance; Auto starts at High on desktop and keeps the Low default on touch devices.
+- **0.6.33:** remove tree foliage left detached by later structure placement while preserving normal ruin placement.
+- **0.6.32:** add terrain-to-foundation supports for settlements, camps and ruins; re-anchor tree roots after later structure placement, and keep palm fronds and bone arches connected to their supports.
+- **0.6.31:** stop oak branches when blocked and only add side crowns where a branch remains connected to the trunk, preventing detached foliage.
+- **0.6.30:** filled and rounded the oak crowns and connected diagonal branch meshes, removing the sparse, floating-log silhouette.
+- **0.6.29:** opaque world materials render both sides of their surfaces, preventing angle-dependent see-through gaps in trees, blocks and ships.
+- **0.6.28:** softened village-pad edges into the surrounding island, added detailed house foundations and timber framing, separated oak foliage into mottled clusters, connected wildlife legs to their bodies, and improved first-person hand and tool grips.
+- **0.6.27:** expanded the chart to 1,824 blocks per side while preserving old island locations and migrating saved edits; added eight large islands and port villages, plus settlements across the frontier islands.
+- **0.6.26:** fixed hairline gaps between adjacent beveled block-built structures by keeping shared edges flush; building-piece components no longer bevel into one another.
+- **0.6.25:** replaced the short, flat-crowned main-island oaks with taller branched trees and layered, irregular foliage; the shared oak generator improves the same species across all islands without changing later generation randomness.
+- **0.6.24:** replaced box-built wildlife with smooth procedural forms, curved barrels, inset storage props, beveled crafted blocks and building pieces, and refined human faces with blinking and subtle idle breathing. Retained the 0.6.23 hull-shaped ship collision and hull detail.
+- **0.6.23:** replaced coarse circle-chain ship impacts and point-sampled coast checks with a hull-shaped waterline footprint, polygon SAT and terrain-cell overlap; added hull strakes and fasteners.
+- **0.6.22:** added the Shipwright’s Wager as an optional story, with four alternative reputation routes to charter three purchasable player hulls. Boats can be bought or switched at Old Mags’ shipyard; hull, sail, rudder, armor and gun upgrades apply across the fleet, with Cutter and Brigantine charters opening later refits. Ownership and active hull are saved compatibly and synchronized to multiplayer crew.
+- **0.6.21:** added packet ships, merchantmen, navy cutters and frigates, pirate raiders and brigs, plus a two-masted dreadship. NPC classes have distinct sailing speeds, turning, durability and gun capacity; the player sloop and save format are unchanged.
 - **0.6.17:** reshaped the underwater island shelves to slope gradually from shore to the shared bedrock floor, removing the abrupt seabed edge.
 - **0.6.18:** added standard-layout gamepad support, including DualSense twin-stick movement and aiming, action buttons and triggers, controller menu navigation, and a title-screen control guide.
 - **0.6.19:** made the helm camera choose terrain-clear viewpoints near islands and reset immediately when taking the helm; raised the mainsail's lower edge to improve forward visibility.
+- **0.6.20:** made interaction prompts reflect keyboard, gamepad or touch input; added an optional, replayable six-step first-voyage guide that persists with existing save hints; enhanced ocean sun glints and shallow-water shimmer.
 - **0.6.16:** doubled the map area by expanding it to 1632 x 1632 blocks, added 23 Outer Reach islands and expedition side quests that require visiting a new island and reporting back. Older 0.6 saves remap their terrain edits into the expanded map while retaining the old islands and player position.
 - **0.6.15:** rebuilt the stern transom as continuous outward-facing hull panels to close a see-through gap across the back of the ship.
 - **0.6.14:** widened and lengthened the hold floor, added plank seams and fasteners, matched bilge collision to the wider hull, and added paused-menu shortcuts for customization, quests and an expandable chart.

@@ -1,7 +1,7 @@
 import { ITEMS, RECIPES, LOOKS } from './config.js';
 import { itemIcon } from './ui.js';
 import { randomLook } from './character.js';
-import { UPGRADES, SUPPLIES } from './shop.js';
+import { UPGRADES, SUPPLIES, VESSELS, vesselProgress } from './shop.js';
 
 // Every menu in the game is a parchment "sheet" laid over the live world.
 const NAMES = { mags: 'Old Mags', tallow: 'Brother Tallow' };
@@ -161,8 +161,8 @@ export class Sheets {
   // your sea chest aboard the sloop: stow things, take them back
   r_chest() {
     const G = this.g;
-    this.paper.append(this.head('Aboard your sloop', 'Sea chest'));
-    this.paper.append(h('p', { class: 'muted', text: 'Stow gold and loot you don’t want to lose. What you carry sinks with you when you die; what’s in the chest is safe unless the sloop goes down. Sell loot to Old Mags.' }));
+    this.paper.append(this.head('Aboard your ship', 'Sea chest'));
+    this.paper.append(h('p', { class: 'muted', text: 'Stow gold and loot you don’t want to lose. What you carry sinks with you when you die; what’s in the chest is safe unless your ship goes down. Sell loot to Old Mags.' }));
     const gold = h('div', { class: 'chestList' });
     gold.append(h('div', { class: 'chestRow' }, h('span', { class: 'coin' }), h('span', { class: 'nm', text: 'Gold' }), h('span', { class: 'ct', text: `${G.gold} carried · ${G.chestGold || 0} stowed` }),
       this.btn('Stow all', () => { G.moveChestGold(true, G.gold); this.render(); }, 'btn small', !(G.gold > 0)),
@@ -208,7 +208,7 @@ export class Sheets {
     }
     this.paper.append(keys.length ? grid : h('p', { class: 'muted', text: 'Your bag is empty.' }));
     const lv = G.lootValue(G.inv);
-    if (lv) this.paper.append(h('p', { class: 'muted', text: `You carry loot worth ${lv} gold. Sell it to Old Mags at Brine Haven, or stow it in the sea chest in your sloop’s hold so a death doesn’t cost you it.` }));
+    if (lv) this.paper.append(h('p', { class: 'muted', text: `You carry loot worth ${lv} gold. Sell it to Old Mags at Brine Haven, or stow it in your ship’s hold so a death doesn’t cost you it.` }));
     this.paper.append(h('div', { class: 'row' }, this.btn('Empty this slot', () => { G.hotbar[slot] = null; G.ui.buildHotbar(); this.render(); }, 'btn small ghost')));
   }
   assign(k, slot) {
@@ -247,6 +247,13 @@ export class Sheets {
     this.paper.append(this.head(Q.done ? 'Free sailing' : `Chapter ${Q.step + 1} of 8`, 'Quests'));
     const so = Q.storyObjective();
     this.paper.append(this.card({ title: Q.chapter, text: so.text, meta: 'Story', story: true, tracked: tr.id === 'story', actions: [tr.id === 'story' ? null : this.btn('Track', () => { Q.tracked = 'story'; this.render(); }, 'btn small ghost')] }));
+    if (Q.step >= 1 || Q.flags.shipwrightIntro) {
+      const yard = Q.shipyardObjective();
+      this.paper.append(this.card({
+        title: yard.title, text: yard.text, meta: 'Side story · shipyard', story: true, tracked: tr.id === 'shipwright',
+        actions: [Q.flags.shipwrightIntro && tr.id !== 'shipwright' ? this.btn('Track', () => { Q.tracked = 'shipwright'; this.render(); }, 'btn small ghost') : null],
+      }));
+    }
     this.paper.append(h('p', { class: 'muted', text: 'Choose Track to set an objective on your compass. New contracts are offered by Old Mags at Brine Haven and Brother Tallow at the lighthouse.' }));
     if (!Q.active.length) this.paper.append(h('p', { class: 'muted', text: 'No contracts yet. Old Mags at Brine Haven posts new work every day, and Brother Tallow does too once the lighthouse burns again.' }));
     for (const q of Q.active) {
@@ -273,6 +280,7 @@ export class Sheets {
     const lv = G.lootValue(G.inv);
     if (d.bank || (id === 'mags' && lv > 0)) this.paper.append(this.card({ title: lv ? `You carry ${G.gold} gold and loot worth ${lv}` : `You carry ${G.gold} gold`, text: lv ? 'Mags buys goblets, pearls, rubies and idols at a fair price, and banks the lot. Banked gold is safe; carried gold and loot sink with you.' : 'Banked gold is safe from storms, skeletons and the Hollow Wake. Carried gold sinks with you.', actions: [this.btn(lv ? `Sell and bank ${G.gold + lv} gold` : `Bank ${G.gold} gold`, () => { G.bank(); this.render(); })] }));
     if (d.story) this.paper.append(this.card({ title: Q.chapter, text: d.story.text, story: true, actions: [this.btn(d.story.button, () => { const nm = this.name; d.story.act(); if (this.name === nm) this.render(); })] }));
+    if (d.shipwright) this.paper.append(this.card({ title: 'The Shipwright’s Wager', text: d.shipwright.text, story: true, actions: [this.btn(d.shipwright.button, () => { const nm = this.name; d.shipwright.act(); if (this.name === nm) this.render(); })] }));
     for (const q of d.ready) {
       this.paper.append(this.card({ title: q.title, text: q.kind === 'delivery' ? 'Hand over the cargo.' : 'The job is done. Collect your pay.', meta: `Reward: ${q.reward} gold`, actions: [this.btn('Hand in', () => { Q.turnIn(q.id, id); this.render(); })] }));
     }
@@ -296,11 +304,31 @@ export class Sheets {
   r_shop() {
     const G = this.g;
     this.paper.append(this.head(`${G.banked} gold banked`, 'Trading post'));
-    this.paper.append(h('p', { class: 'muted', text: 'Old Mags only takes banked gold. Upgrades last the whole voyage, even if your sloop sinks.' }));
+    this.paper.append(h('p', { class: 'muted', text: G.net.inCrew ? 'Old Mags only takes banked gold. Shipyard refits wait until you are back on your own voyage.' : `Old Mags only takes banked gold. Your ${G.sloop.design.label} is in service; upgrades carry across every hull. Step ashore to commission or switch boats.` }));
+    this.paper.append(h('h3', { text: 'Shipyard' }));
+    const hulls = [{ id: 'sloop', name: 'Sloop', price: 0, starter: true, desc: 'Your original, balanced all-rounder.' }, ...VESSELS];
+    for (const vessel of hulls) {
+      const owned = !!G.ownedShips[vessel.id], active = G.shipType === vessel.id;
+      const progress = vessel.starter ? null : vesselProgress(G, vessel);
+      const previous = vessel.requires === 'sloop' || (vessel.requires && G.ownedShips[vessel.requires]);
+      const charter = vessel.starter || (G.quests.flags.shipwrightIntro && previous && progress.unlocked);
+      const canRefit = G.player.mode === 'foot' && !G.player.ship && !G.net.inCrew;
+      const nextName = vessel.requires && VESSELS.find((v) => v.id === vessel.requires)?.name;
+      const state = active ? 'In service.' : owned ? 'Owned; available at the pier.' : !G.quests.flags.shipwrightIntro ? 'Ask Old Mags about the Shipwright’s Wager.' : !previous ? `Commission the ${nextName} first.` : `${progress.text}. Any one route earns its charter.`;
+      this.paper.append(h('div', { class: 'shopitem' + (owned ? ' owned' : '') },
+        h('div', {}, h('div', { class: 'rname', text: vessel.name }), h('div', { class: 'rnote', text: `${vessel.desc} ${state}` })),
+        this.btn(active ? 'In service' : owned ? 'Select' : `Commission · ${vessel.price}`, () => {
+          const changed = owned ? G.selectVessel(vessel.id) : G.buyVessel(vessel.id);
+          if (changed) this.render();
+        }, 'btn small', active || !canRefit || (!owned && (!charter || G.banked < vessel.price)))));
+    }
+    this.paper.append(h('p', { class: 'muted', text: 'Charter routes are tracked in your quest log. Switching hulls recalls your current boat to the Brine Haven pier and preserves its hull condition.' }));
     this.paper.append(h('h3', { text: 'Upgrades' }));
     for (const u of UPGRADES) {
-      const owned = !!G.upgrades[u.id], locked = u.req && !G.upgrades[u.req];
-      const note = locked ? `${u.desc} Needs ${UPGRADES.find((x) => x.id === u.req).name.toLowerCase()} first.` : u.desc;
+      const owned = !!G.upgrades[u.id], locked = !owned && ((u.req && !G.upgrades[u.req]) || (u.reqVessel && !G.ownedShips[u.reqVessel]));
+      const needUpgrade = !owned && u.req && !G.upgrades[u.req] ? `Needs ${UPGRADES.find((x) => x.id === u.req).name.toLowerCase()} first.` : '';
+      const needVessel = !owned && u.reqVessel && !G.ownedShips[u.reqVessel] ? `Needs a ${VESSELS.find((v) => v.id === u.reqVessel).name} charter first.` : '';
+      const note = [u.desc, needUpgrade, needVessel].filter(Boolean).join(' ');
       this.paper.append(h('div', { class: 'shopitem' + (owned ? ' owned' : '') },
         h('div', {}, h('div', { class: 'rname', text: u.name }), h('div', { class: 'rnote', text: note })),
         this.btn(owned ? 'Owned' : `Buy · ${u.price}`, () => { if (G.buyUpgrade(u.id)) this.render(); }, 'btn small', owned || locked || G.banked < u.price)));
@@ -326,6 +354,7 @@ export class Sheets {
       G.net.available || G.net.role ? this.btn(G.net.role === 'host' ? `Crew · ${G.net.crew.size}` : G.net.inCrew ? 'Crew · aboard' : 'Crew', () => G.openSheet('crew'), 'btn ghost') : null,
       this.btn('Settings', () => G.openSheet('settings', {}), 'btn ghost'),
       this.btn('How to play', () => G.openSheet('help', {}), 'btn ghost'),
+      this.btn('Replay voyage guide', () => G.replayTutorial(), 'btn ghost'),
       G.player.alive ? this.btn('I’m stuck', () => G.startStuck(), 'btn ghost') : null));
     this.paper.append(h('div', { class: 'row' },
       this.btn('Sea chart', () => G.openSheet('map')),
@@ -363,7 +392,7 @@ export class Sheets {
     } else if (N.isCrew) {
       this.paper.append(h('p', { text: `You sail with ${N.hostName}. Your gold, gear and look stay yours and go home with you. Islands you pass are added to your own chart.` }));
       for (const m of N.roster()) this.paper.append(h('div', { class: 'crewrow' + (m.host ? ' me' : '') }, h('div', {}, h('div', { class: 'cn', text: (m.host ? '⚓ ' : '') + m.name }), h('div', { class: 'cm', text: `${m.host ? 'Captain' : 'Crew'} · ${!m.alive ? 'down' : m.aboard ? 'on deck' : 'ashore'}` }))));
-      this.paper.append(h('div', { class: 'row' }, this.confirmBtn('Leave the crew', () => { G.closeSheet(); N.leave('You rowed back to your own sloop.'); }, 'btn small ghost')));
+      this.paper.append(h('div', { class: 'row' }, this.confirmBtn('Leave the crew', () => { G.closeSheet(); N.leave('You rowed back to your own voyage.'); }, 'btn small ghost')));
     } else {
       const inGame = G.state === 'play' || G.state === 'sheet';
       this.paper.append(this.card({ title: 'Open your voyage', text: 'Friends who have this page open can come aboard your ship. Your world and your story; they bring their own gold and gear.', actions: [inGame ? this.btn('Open to friends', async () => { await N.startHost(); if (this.name === 'crew') this.render(); }) : null] }));
@@ -432,7 +461,7 @@ export class Sheets {
     this.paper.append(this.head('Settings', 'Settings'));
     const set = (k, v) => { S.set(k, v); G.applySettings(); };
     const form = h('div', { class: 'form' });
-    form.append(this.optRow('Graphics', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], S.get('quality'), (v) => { set('quality', v); this.render(); }));
+    form.append(this.optRow('Graphics', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], S.get('quality'), (v) => { set('quality', v); this.render(); }));
     form.append(this.optRow('View distance', [['near', 'Near'], ['normal', 'Normal'], ['far', 'Far']], S.get('view'), (v) => { set('view', v); this.render(); }));
     form.append(this.optRow('Camera', [['first', 'First person'], ['third', 'Third person']], G.camMode, (v) => { G.camMode = v; S.set('camera', v); this.render(); }));
     form.append(this.range('Field of view', 60, 95, 1, S.get('fov'), (v) => set('fov', v), (v) => `${Math.round(v)}°`));
@@ -455,11 +484,11 @@ export class Sheets {
     const touch = [['Move', 'Left half of the screen'], ['Look', 'Right half of the screen'], ['Mine, attack, fire a gun', 'Hit'], ['Place, eat, throw the hook, aim the musket', 'Place'], ['Crouch', 'Crouch'], ['Emotes', 'Emote'], ['Building pieces', 'Tap them above the hotbar'], ['At the helm', 'Stick up for sail, sideways to steer, Fire buttons for broadsides']];
     const table = (rows) => h('div', { class: 'stats' }, rows.map(([a, b]) => [a, h('b', { text: b })]));
     if (G.isTouch) { this.paper.append(h('h3', { text: 'Touch' }), table(touch)); }
-    this.paper.append(h('h3', { text: 'On foot' }), table(desk), h('h3', { text: 'Aboard your sloop' }), table(aboard), h('h3', { text: 'At the helm' }), table(helm));
+    this.paper.append(h('h3', { text: 'On foot' }), table(desk), h('h3', { text: 'Aboard your ship' }), table(aboard), h('h3', { text: 'At the helm' }), table(helm));
     this.paper.append(h('h3', { text: 'Building and breaking' }), h('p', { class: 'muted', text: 'Hold the builder’s hammer to put down floors, walls, windows, doorways, stairs, roofs and posts. Walls snap to the edge of the floor you aim at; stairs and roofs climb away from you. Wood costs planks, stone costs bricks. Cut a tree at the trunk and it comes down whole. Knock out what holds something up and it falls. Powder kegs (Craft) go off a few seconds after you hit them.' }));
     this.paper.append(h('h3', { text: 'Guns' }), h('p', { class: 'muted', text: 'Pick a gun on your hotbar and click to fire: one ball, then a reload (the ring round the crosshair). The pistol is quick, the blunderbuss sprays shot up close, and the long musket hits far: hold right click (Place on touch) to aim down the barrel. Guns use lead shot: melt a cannonball into ten at the craft bench. A shot sets off a powder keg.' }));
     this.paper.append(h('h3', { text: 'Boarding other ships' }), h('p', { class: 'muted', text: 'Swim to any ship, or swing over on the grappling hook, and climb aboard. Her crew will fight: cut down the helmsman and she loses way, and mind the lookout’s musket up in the crow’s nest. Beat them all and break open the strongbox in her hold. Boarding a merchantman or the navy puts the navy on your trail.' }));
-    this.paper.append(h('h3', { text: 'Loot' }), h('p', { class: 'muted', text: 'Gold and valuables you carry (goblets, pearls, rubies, idols) are lost if you die. Stow them in the sea chest in your sloop’s hold, where they’re safe unless she sinks, and sell them to Old Mags when you bank. Hollowmen rise at night away from lantern light, and the Hollow Wake hunts anyone carrying cursed gold.' }));
+    this.paper.append(h('h3', { text: 'Loot' }), h('p', { class: 'muted', text: 'Gold and valuables you carry (goblets, pearls, rubies, idols) are lost if you die. Stow them in your ship’s hold, where they’re safe unless she sinks, and sell them to Old Mags when you bank. Hollowmen rise at night away from lantern light, and the Hollow Wake hunts anyone carrying cursed gold.' }));
     this.paper.append(h('h3', { text: 'Stuck?' }), h('p', { class: 'muted', text: 'Menu, I’m stuck, then stand still for seven seconds and you’re lifted out to open air.' }));
     this.paper.append(h('h3', { text: 'Music' }), h('p', { class: 'muted', text: 'The band follows your voyage: a shanty at the title, a jig under sail, a hornpipe ashore, a waltz after dark and a reel when a fight starts. Turn it off, or the volume down, in Settings.' }));
     this.paper.append(h('h3', { text: 'Sailing with friends' }), h('p', { class: 'muted', text: 'Open your voyage from Crew in the menu, and friends who have this page open can join your ship. One pirate steers at a time; whoever holds the wheel fires the broadsides with their own shot. Everyone keeps their own gold, gear and look, and takes them home when they leave.' }));
@@ -482,6 +511,10 @@ export class Sheets {
       form.append(this.optRow('Hat', LOOKS.hat.map((b, i) => [i, b]), L.hat, (i) => upd('hat', i)));
       form.append(this.swatches('Coat', LOOKS.coat.map((c) => c.c), L.coat, (i) => upd('coat', i), LOOKS.coat.map((c) => c.name)));
       form.append(this.optRow('Eyes', [[false, 'Both eyes'], [true, 'Eye patch']], !!L.patch, (v) => upd('patch', v)));
+      if (fresh) {
+        if (this.opts.showGuide == null) this.opts.showGuide = true;
+        form.append(this.check('Show the optional first-voyage guide', this.opts.showGuide, (v) => { this.opts.showGuide = v; }));
+      }
     } else {
       form.append(this.textField('Ship name', L.ship, 26, (v) => { L.ship = v || 'The Salt Wren'; G.applyLook('ship'); }));
       form.append(this.swatches('Hull', LOOKS.hull.map((c) => c.c), L.hull, (i) => upd('hull', i), LOOKS.hull.map((c) => c.name)));
@@ -492,7 +525,7 @@ export class Sheets {
     if (fresh) this.paper.append(h('p', { class: 'muted', text: 'A new voyage replaces your autosave. Voyages saved in numbered slots are kept.' }));
     const row = h('div', { class: 'row stick' });
     row.append(this.btn('Shuffle', () => { const keep = { name: L.name, ship: L.ship }; Object.assign(L, randomLook(), keep); G.applyLook('all'); this.render(); }, 'btn ghost'));
-    if (fresh) { row.append(this.btn('Back', () => G.closeSheet(), 'btn ghost'), this.btn('Set sail', () => G.beginVoyage(L))); }
+    if (fresh) { row.append(this.btn('Back', () => G.closeSheet(), 'btn ghost'), this.btn('Set sail', () => G.beginVoyage(L, this.opts.showGuide))); }
     else row.append(this.btn('Done', () => { G.autosave('look', true); G.openSheet('menu'); }));
     this.paper.append(row);
   }

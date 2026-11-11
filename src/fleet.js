@@ -1,8 +1,8 @@
-// Other ships at sea. Merchantmen ply between the islands (and run if you fire on them), a navy cutter keeps
-// the peace (and hunts you once you've sunk a merchant or fired on the Crown), and rival pirates come at
+// Other ships at sea. Merchant ships ply between the islands (and run if you fire on them), navy cutters and
+// frigates keep the peace (and hunt you once you've sunk a merchant or fired on the Crown), and rival pirates come at
 // anyone they find. The Hollow Wake's ghost ships are managed by the game itself.
 import { W, D, SEA, clamp, wrapAngle } from './config.js';
-import { Ship, SHIP_NAMES } from './ship.js';
+import { Ship, SHIP_NAMES, shipDesignFor } from './ship.js';
 import { hollowAI } from './enemies.js';
 
 const WANT = { merchant: 2, navy: 1, pirate: 2 };
@@ -36,7 +36,7 @@ function steer(s, G, dt, desired) {
 const headingTo = (s, x, z) => Math.atan2(-(x - s.pos.x), -(z - s.pos.z));
 
 export class Fleet {
-  constructor(G) { this.g = G; this.t = 0; this.notoriety = 0; this.notT = 0; }
+  constructor(G) { this.g = G; this.t = 0; this.notoriety = 0; this.notT = 0; this.designTally = {}; }
   get ships() { return this.g.hollows.filter((s) => s.kind !== 'hollow'); }
   clear() { this.notoriety = 0; this.notT = 0; }
   // the player's position at sea or ashore
@@ -68,7 +68,13 @@ export class Fleet {
       if (G.hollows.some((h) => Math.hypot(h.pos.x - x, h.pos.z - z) < 40)) continue;
       const used = G.hollows.filter((h) => h.kind === kind).map((h) => h.name), names = SHIP_NAMES[kind] || [];
       const free = names.map((n, k) => k).filter((k) => !used.includes(names[k]));
-      const s = new Ship(G.scene, kind, { nameIx: free.length ? free[(Math.random() * free.length) | 0] : 0 });
+      let nameIx = 0;
+      if (free.length) {
+        const leastUsed = Math.min(...free.map((ix) => this.designTally[shipDesignFor(kind, ix).id] || 0));
+        const choices = free.filter((ix) => (this.designTally[shipDesignFor(kind, ix).id] || 0) === leastUsed);
+        nameIx = choices[(Math.random() * choices.length) | 0];
+      }
+      const s = new Ship(G.scene, kind, { nameIx });
       const L = Math.min(10, G.level);
       s.maxHp = s.hp = s.maxHp + L * (kind === 'navy' ? 22 : 15);
       if (kind === 'navy') s.dmgMul = 1.15;
@@ -78,6 +84,7 @@ export class Fleet {
       if (s.hullHits(w, x, z, s.heading)) { s.dispose(); continue; }
       s.sailLvl = 0.8;
       G.hollows.push(s);
+      this.designTally[s.design.id] = (this.designTally[s.design.id] || 0) + 1;
       G.crews.man(s);
       return s;
     }
@@ -97,7 +104,7 @@ export class Fleet {
     const G = this.g, was = this.notoriety;
     this.notoriety = Math.min(4, this.notoriety + n); this.notT = 0;
     if (was === 0 && this.notoriety > 0) {
-      G.ui.toast(why, 'The navy has your colours now. Their cutter will hunt you until the talk dies down.', 'bad');
+      G.ui.toast(why, 'The navy has your colours now. Crown warships will hunt you until the talk dies down.', 'bad');
       G.net.toastAll(why, 'The navy is hunting this crew for a while.', 'bad');
     }
   }

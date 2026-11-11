@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { W, D, H, SEA, WATER_Y, FLOOR, WORLD_Y_SHIFT, LEGACY_W, LEGACY_D, SEED, B, BLOCKS, ITEMS, RECIPES, DEFAULT_HOTBAR, VERSION, clamp, wrapAngle } from './config.js';
+import { W, D, H, SEA, WATER_Y, FLOOR, WORLD_Y_SHIFT, LEGACY_W, LEGACY_D, PREVIOUS_MAP_W, SEED, B, BLOCKS, ITEMS, RECIPES, DEFAULT_HOTBAR, VERSION, clamp, wrapAngle } from './config.js';
 import { World, TERRAIN, CRISP } from './world.js';
 import { Ocean, waveHeight, waveState } from './water.js';
 import { Sky, CYCLE } from './sky.js';
-import { Ship, SHIP, HELM, LADDER, CHEST, GUNS, gunPlace, fireBroadside, fireGun, SCALE, HULL_CIRCLES } from './ship.js';
+import { Ship, SHIP, HELM, LADDER, CHEST, GUNS, PLAYER_VESSELS, gunPlace, fireBroadside, fireGun, SCALE } from './ship.js';
 import { Player, EMOTES } from './player.js';
 import { Enemies, hollowAI } from './enemies.js';
 import { Particles, Projectiles } from './fx.js';
@@ -31,11 +31,11 @@ import { Life } from './life.js';
 import { Fauna } from './fauna.js';
 import { SaveSystem, packEdits, unpackEdits } from './save.js';
 import { Settings, QUALITY, VIEW } from './settings.js';
-import { UPGRADES, SUPPLIES } from './shop.js';
+import { UPGRADES, SUPPLIES, VESSELS, vesselProgress } from './shop.js';
 import { Net } from './net.js';
 
 const START_INV = { cutlass: 1, pick: 1, hook: 1, hammer: 1, pistol: 1, shot: 12, wood: 0, plank: 14, stone: 0, brick: 0, sand: 0, dirt: 0, lantern: 2, coconut: 3, grog: 1, ball: 12, bone: 0 };
-const QUALITY_ORDER = ['high', 'medium', 'low'];
+const QUALITY_ORDER = ['ultra', 'high', 'medium', 'low'];
 const IDLE = { move: { x: 0, y: 0 }, lookDX: 0, lookDY: 0, sprint: false, jumpHeld: false, primaryHeld: false, take: () => false };
 const _eye = new THREE.Vector3(), _dir = new THREE.Vector3(), _v = new THREE.Vector3(), _o = new THREE.Vector3(), _w = new THREE.Vector3(), _look = new THREE.Vector3();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _x = new THREE.Vector3(), _ya = new THREE.Vector3(), _zb = new THREE.Vector3();
@@ -58,7 +58,7 @@ export class Game {
     this.hotDoc = hot && (hot.v === 2 || hot.v === 3) && hot.doc ? hot.doc : null;
     this.isTouch = matchMedia('(pointer: coarse)').matches;
     this.settings = new Settings(this.isTouch);
-    this.autoQ = this.isTouch ? 'low' : 'medium';
+    this.autoQ = this.isTouch ? 'low' : 'high';
     this.autoJump = this.isTouch;
     this.renderer = new THREE.WebGLRenderer({ antialias: !this.isTouch, powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -148,7 +148,13 @@ export class Game {
   qualityPreset() {
     const name = this.qualityName();
     const q = QUALITY[name] || QUALITY.medium;
-    return { ...q, name, view: (VIEW[this.settings.get('view')] || VIEW.normal) * (name === 'low' ? 0.85 : 1) };
+    const viewScale = name === 'ultra' ? 1.15 : name === 'low' ? 0.85 : 1;
+    return {
+      ...q,
+      name,
+      view: (VIEW[this.settings.get('view')] || VIEW.normal) * viewScale,
+      shadows: Math.min(q.shadows, this.renderer.capabilities.maxTextureSize),
+    };
   }
   applySettings() {
     const S = this.settings, q = this.qualityPreset();
@@ -187,6 +193,7 @@ export class Game {
     this.sel = 0; this.gold = 0; this.banked = 0; this.earned = 0; this.level = 0;
     this.stats = { wood: 0, crafted: 0, boarded: 0, kills: 0, ships: 0, blocks: 0, placed: 0, chests: 0 };
     this.upgrades = {}; this.hints = {};
+    this.ownedShips = { sloop: true }; this.shipType = 'sloop';
     this.pet = null;
     if (this.avatar) this.avatar.setPet(null);
   }
@@ -245,10 +252,11 @@ export class Game {
     const P = this.player, s = this.sloop;
     const onShip = (P.mode === 'deck' || P.mode === 'helm') && !!s && !s.sinking;
     return {
-      v: 4, seed: SEED, version: VERSION,
+      v: 4, seed: SEED, version: VERSION, mapW: W, mapD: D,
       look: { ...this.look }, inv: { ...this.inv }, chest: { ...this.chest }, chestGold: this.chestGold || 0, hotbar: [...this.hotbar], sel: this.sel,
       gold: this.gold, banked: this.banked, earned: this.earned, level: this.level,
       stats: { ...this.stats }, upgrades: { ...this.upgrades }, hints: { ...this.hints }, pet: this.pet,
+      ownedShips: { ...this.ownedShips }, shipType: this.shipType,
       time: this.time, wind: this.wind.angle, camMode: this.camMode,
       player: { x: P.pos.x, y: P.pos.y, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, hp: P.hp, hunger: P.hunger, onShip, lx: P.local.x, lz: P.local.z },
       ship: s && !s.sinking ? { x: s.pos.x, z: s.pos.z, h: s.heading, hp: s.hp } : null,
@@ -375,10 +383,12 @@ export class Game {
       && (savedVersion[0] < 0 || (savedVersion[0] === 0 && (savedVersion[1] < 6 || (savedVersion[1] === 6 && savedVersion[2] < 12))));
     const oldMap = savedVersion.length !== 3 || !savedVersion.every(Number.isFinite)
       || savedVersion[0] < 0 || (savedVersion[0] === 0 && (savedVersion[1] < 6 || (savedVersion[1] === 6 && savedVersion[2] < 16)));
-    if (oldMap) {
+    const sourceW = oldMap ? LEGACY_W : (Number.isInteger(d.mapW) && d.mapW > 0 ? d.mapW : PREVIOUS_MAP_W);
+    const sourceD = oldMap ? LEGACY_D : (Number.isInteger(d.mapD) && d.mapD > 0 ? d.mapD : PREVIOUS_MAP_W);
+    if (oldMap || sourceW !== W || sourceD !== D) {
       edits = edits.map(([i, id]) => {
-        const x = i % LEGACY_W, z = Math.floor(i / LEGACY_W) % LEGACY_D;
-        const y = Math.floor(i / (LEGACY_W * LEGACY_D)) + (oldWorld ? WORLD_Y_SHIFT : 0);
+        const x = i % sourceW, z = Math.floor(i / sourceW) % sourceD;
+        const y = Math.floor(i / (sourceW * sourceD)) + (oldWorld ? WORLD_Y_SHIFT : 0);
         return [x + W * (z + D * y), id];
       });
       if (oldWorld && d.player && Number.isFinite(d.player.y)) d = { ...d, player: { ...d.player, y: d.player.y + WORLD_Y_SHIFT } };
@@ -416,6 +426,10 @@ export class Game {
     this.gold = d.gold || 0; this.banked = d.banked || 0; this.earned = d.earned || 0; this.level = d.level || 0;
     Object.assign(this.stats, d.stats || {});
     this.upgrades = { ...(d.upgrades || {}) }; this.hints = { ...(d.hints || {}) };
+    if (d.ownedShips && typeof d.ownedShips === 'object' && !Array.isArray(d.ownedShips)) {
+      for (const vessel of PLAYER_VESSELS) if (vessel.id !== 'sloop' && d.ownedShips[vessel.id] === true) this.ownedShips[vessel.id] = true;
+    }
+    if (typeof d.shipType === 'string' && this.ownedShips[d.shipType]) this.shipType = d.shipType;
     // captains from before 0.5 find a pistol in their bag: give it a hotbar slot once
     if (this.inv.pistol && !this.hints.gunGift) {
       this.hints.gunGift = 1;
@@ -458,13 +472,28 @@ export class Game {
     P.alive = true; P.hp = P.maxHp; P.hunger = 100;
     this.placeAtSpawn();
   }
-  beginVoyage(look) {
+  beginVoyage(look, showGuide = true) {
     this.sheets.close();
     this.newVoyage(look);
+    this.hints.tutorialStep = showGuide ? 0 : 6;
     this.startPlay();
     this.ui.toast('Brine Haven', `Welcome, ${this.look.name}. Old Mags keeps the trading post up the beach, and your sloop waits at the pier.`);
     this.after(7, () => this.ui.toast('Landfall', this.isTouch ? 'Hold Hit on a tree trunk to gather wood. The View button shows your captain.' : 'Hold left click on a tree trunk to gather wood. Press V to see your captain.'));
     this.autosave('new', true);
+  }
+  advanceTutorial() {
+    const step = this.hints.tutorialStep;
+    if (!Number.isInteger(step) || step < 0 || step > 5) return;
+    this.hints.tutorialStep = step === 5 ? 6 : step + 1;
+    if (this.hints.tutorialStep === 6) this.ui.toast('Fair winds', 'Your guide is complete. Replay it any time from the menu.');
+  }
+  skipTutorial() {
+    if (!Number.isInteger(this.hints.tutorialStep) || this.hints.tutorialStep >= 6) return;
+    this.hints.tutorialStep = 6;
+  }
+  replayTutorial() {
+    this.hints.tutorialStep = 0;
+    this.closeSheet();
   }
   startPlay() {
     this.sfx.init();
@@ -502,7 +531,7 @@ export class Game {
   }
   spawnSloop(sd) {
     this.removeShip(this.sloop);
-    const s = new Ship(this.scene, 'sloop', { look: this.look });
+    const s = new Ship(this.scene, 'sloop', { look: this.look, playerVessel: this.shipType });
     this.sloop = s;
     if (sd && !s.hullHits(this.world, sd.x, sd.z, sd.h)) s.place(sd.x, sd.z, sd.h);
     else { const d = this.world.dock; s.place(d.x, d.z, d.heading); }
@@ -527,11 +556,14 @@ export class Game {
   applyUpgrades() {
     const u = this.upgrades, s = this.sloop, P = this.player;
     if (s && !s.remote) {
-      s.maxHp = 120 + (u.hull1 ? 40 : 0) + (u.hull2 ? 50 : 0);
+      s.maxHp = s.design.hp + (u.hull1 ? 40 : 0) + (u.hull2 ? 50 : 0);
       s.hp = Math.min(s.hp, s.maxHp);
+      s.baseSpeed = s.design.speed; s.maxSpeed = s.baseSpeed;
       s.speedMul = 1 + (u.sails1 ? 0.12 : 0) + (u.sails2 ? 0.13 : 0);
-      s.guns = u.guns ? 3 : 2;
+      s.turnMul = s.design.turn * (u.rudder ? 1.15 : 1);
+      s.guns = Math.max(s.design.guns, u.guns ? 3 : 2);
       s.reloadMul = u.reload ? 0.75 : 1;
+      s.armorMul = u.keel ? 0.85 : 1;
     }
     P.maxHp = 100 + (u.coat ? 30 : 0);
     P.hp = Math.min(P.hp, P.maxHp);
@@ -1169,7 +1201,7 @@ export class Game {
     const g = this.viewArm.group, S = 0.55;
     g.quaternion.multiplyQuaternions(_qs, _q);
     g.scale.setScalar(S);
-    this.viewArm.hand.scale.setScalar(0.62);
+    this.viewArm.hand.scale.setScalar(1);
     const hx = 0.42 + Math.cos(P.walkPhase * 0.5) * 0.012 * mv, hy = -0.26 + bob * 0.012, hz = -0.9;
     g.position.set(hx - _a.x * 0.72 * S, hy - _a.y * 0.72 * S, hz - _a.z * 0.72 * S);
   }
@@ -1186,7 +1218,7 @@ export class Game {
     const g = this.viewArm.group, S = 0.55;
     g.quaternion.multiplyQuaternions(_qs, _q);
     g.scale.setScalar(S);
-    this.viewArm.hand.scale.setScalar(0.62);
+    this.viewArm.hand.scale.setScalar(1);
     const sway = (1 - A) * mv;
     const hx = 0.3 - 0.22 * A + Math.cos(P.walkPhase * 0.5) * 0.012 * sway, hy = -0.27 + A * 0.12 + bob * 0.012 * (1 - A), hz = -0.62 + K * 0.07;
     g.position.set(hx - _a.x * 0.72 * S, hy - _a.y * 0.72 * S, hz - _a.z * 0.72 * S);
@@ -1626,7 +1658,7 @@ export class Game {
   }
   buyUpgrade(id) {
     const u = UPGRADES.find((x) => x.id === id);
-    if (!u || this.upgrades[id] || (u.req && !this.upgrades[u.req]) || this.banked < u.price) return false;
+    if (!u || this.upgrades[id] || (u.req && !this.upgrades[u.req]) || (u.reqVessel && !this.ownedShips[u.reqVessel]) || this.banked < u.price) return false;
     this.banked -= u.price;
     this.upgrades[id] = true;
     this.applyUpgrades();
@@ -1635,6 +1667,36 @@ export class Game {
     this.sfx.coin();
     this.ui.toast(u.name, u.desc, 'good');
     this.autosave('shop', true);
+    return true;
+  }
+  refitVessel(id) {
+    const vessel = PLAYER_VESSELS.find((v) => v.id === id);
+    if (!vessel || this.net.inCrew || this.player.mode !== 'foot' || this.player.ship || !this.world.dock) return false;
+    const hpRatio = this.sloop && this.sloop.maxHp > 0 ? clamp(this.sloop.hp / this.sloop.maxHp, 0, 1) : 1;
+    const dock = this.world.dock;
+    this.shipType = id;
+    this.spawnSloop({ x: dock.x, z: dock.z, h: dock.heading, hp: 1 });
+    this.sloop.hp = Math.max(1, Math.round(this.sloop.maxHp * hpRatio));
+    this.sfx.place();
+    return true;
+  }
+  selectVessel(id) {
+    const vessel = PLAYER_VESSELS.find((v) => v.id === id);
+    if (!vessel || this.shipType === id || !this.ownedShips[id] || !this.refitVessel(id)) return false;
+    this.autosave('shipyard', true);
+    this.ui.toast(`${vessel.label} in service`, 'Old Mags has your previous boat berthed at Brine Haven.', 'good');
+    return true;
+  }
+  buyVessel(id) {
+    const vessel = VESSELS.find((v) => v.id === id);
+    if (!vessel || this.ownedShips[id] || !this.quests.flags.shipwrightIntro || !this.ownedShips[vessel.requires]
+      || !vesselProgress(this, vessel).unlocked || this.banked < vessel.price) return false;
+    if (!this.refitVessel(id)) return false;
+    this.banked -= vessel.price;
+    this.ownedShips[id] = true;
+    this.sfx.coin();
+    this.ui.toast(`${vessel.name} commissioned`, `${vessel.desc} Old Mags has your former vessel berthed at Brine Haven.`, 'good');
+    this.autosave('shipyard', true);
     return true;
   }
   buySupply(i) {
@@ -1768,25 +1830,19 @@ export class Game {
     this.particles.burst(s.pos.x, s.pos.y + 1.3, s.pos.z, 0xc0915c, 10, 1.5, 2, 12, 0.6, 1.5);
     this.ui.pickup('Hull patched, −1 plank');
   }
-  // Ships against ships, hull to hull: each hull is a chain of circles that follows its shape, so ships can lie
-  // alongside each other and a bow can strike a side. Overlaps are pushed apart (the heavier ship gives less
-  // ground), the way they were closing at is taken off, a glancing blow swings them apart, and a hard knock hurts.
+  // Ships against ships: separating axes on the waterline hull outlines allow alongside contact and bow-to-side
+  // impacts without the oversized gaps and false positives from a chain of circles.
   shipCollisions() {
     const ships = [this.sloop, ...this.hollows].filter((s) => s && !s.sinking);
     const MASS = { sloop: 1, merchant: 1.35, navy: 1.6, pirate: 1.15, hollow: 1.2 };
-    for (const s of ships) s.hullCircles();
     for (let i = 0; i < ships.length; i++) for (let j = i + 1; j < ships.length; j++) {
       const a = ships[i], b = ships[j];
       const reach = 6.8 * (a.size + b.size);
       if (Math.abs(b.pos.x - a.pos.x) > reach || Math.abs(b.pos.z - a.pos.z) > reach) continue;
-      let best = null;
-      for (const ca of a.circ) for (const cb of b.circ) {
-        const dx = cb[0] - ca[0], dz = cb[1] - ca[1], d = Math.hypot(dx, dz), pen = ca[2] + cb[2] - d;
-        if (pen > 0 && (!best || pen > best.pen)) best = { pen, ux: d > 1e-3 ? dx / d : 1, uz: d > 1e-3 ? dz / d : 0, cx: ca[0] + (dx / (d || 1)) * ca[2], cz: ca[1] + (dz / (d || 1)) * ca[2] };
-      }
+      const best = a.hullContact(b);
       if (!best) continue;
       const ma = (MASS[a.kind] || 1.2) * (a.variant === 'flagship' ? 1.3 : 1), mb = (MASS[b.kind] || 1.2) * (b.variant === 'flagship' ? 1.3 : 1);
-      const wa = mb / (ma + mb), wb = ma / (ma + mb), { ux, uz, pen } = best;
+      const wa = mb / (ma + mb), wb = ma / (ma + mb), { nx: ux, nz: uz, depth: pen } = best;
       a.pos.x -= ux * pen * wa; a.pos.z -= uz * pen * wa; b.pos.x += ux * pen * wb; b.pos.z += uz * pen * wb;
       const fax = -Math.sin(a.heading), faz = -Math.cos(a.heading), fbx = -Math.sin(b.heading), fbz = -Math.cos(b.heading);
       const na = fax * ux + faz * uz, nb = fbx * ux + fbz * uz;            // how much of each ship's way points along the contact
@@ -1796,7 +1852,7 @@ export class Game {
       a.speed -= J * wa * na; b.speed += J * wb * nb;
       // where they touch, off each ship's centreline, turns her: the bows swing apart
       for (const [s, sign, w] of [[a, 1, wa], [b, -1, wb]]) {
-        const rx = best.cx - s.pos.x, rz = best.cz - s.pos.z;
+        const rx = best.x - s.pos.x, rz = best.z - s.pos.z;
         const torque = (rx * uz - rz * ux) * sign;
         s.heading = wrapAngle(s.heading + clamp(torque * closing * 0.0025 * w, -0.06, 0.06));
       }
@@ -1804,8 +1860,8 @@ export class Game {
         a.bumpCD = 1; b.bumpCD = 1;
         const hard = closing - 1.6;
         if (a.kind !== b.kind || a === this.sloop || b === this.sloop) { a.damage(hard * 2.6 * Math.sqrt(mb / ma), this); b.damage(hard * 2.6 * Math.sqrt(ma / mb), this); }
-        this.sfx.crash(this.distToListener(best.cx, best.cz));
-        this.particles.burst(best.cx, WATER_Y + 1.5, best.cz, 0x6b4426, 12, 3, 3, 12, 0.8, 0.8);
+        this.sfx.crash(this.distToListener(best.x, best.z));
+        this.particles.burst(best.x, WATER_Y + 1.5, best.z, 0x6b4426, 12, 3, 3, 12, 0.8, 0.8);
         if (a === this.sloop || b === this.sloop) this.shake(Math.min(0.9, 0.25 + hard * 0.12));
       }
     }
@@ -1985,9 +2041,9 @@ export class Game {
       if (P.mode === 'deck' || P.mode === 'helm') P.leaveShip(ship);
       P.boardCD = 99;
       const full = Object.keys(this.chest).length || this.chestGold > 0;
-      this.ui.toast('Your sloop is going down', full ? 'Swim clear. Your sea chest, and everything stowed in it, goes down with her.' : 'Swim clear. The tide will carry you back to Brine Haven.', 'bad');
+      this.ui.toast(`Your ${ship.design.label.toLowerCase()} is going down`, full ? 'Swim clear. Your sea chest, and everything stowed in it, goes down with her.' : 'Swim clear. The tide will carry you back to Brine Haven.', 'bad');
       this.chest = {}; this.chestGold = 0;
-      this.net.toastAll('The ship is going down', 'Swim clear! The captain will find a new sloop at Brine Haven.', 'bad');
+      this.net.toastAll('The ship is going down', 'Swim clear! The captain will find a new boat at Brine Haven.', 'bad');
       this.after(4.5, () => this.washAshore());
       return;
     }
@@ -2015,6 +2071,7 @@ export class Game {
     this.after(10, () => { if (this.hollows.includes(ship)) this.removeHollow(ship); });
   }
   washAshore() {
+    const vesselName = this.sloop ? this.sloop.design.label.toLowerCase() : 'boat';
     this.ui.fade(true);
     this.after(1.2, () => {
       const lost = this.gold + this.dropLoot();
@@ -2025,7 +2082,7 @@ export class Game {
       P.alive = true; P.hp = Math.max(P.hp, P.maxHp * 0.6); P.boardCD = 0;
       for (const h of this.hollows) if (h.kind === 'hollow') h.leaving = true;
       this.ui.fade(false);
-      this.ui.toast('Washed ashore at Brine Haven', lost > 0 ? `The sea kept your ${lost} unbanked gold. Old Mags found you a new sloop.` : 'Old Mags found you a new sloop at the pier.', 'bad');
+      this.ui.toast('Washed ashore at Brine Haven', lost > 0 ? `The sea kept your ${lost} unbanked gold. Old Mags found you a new ${vesselName}.` : `Old Mags found you a new ${vesselName} at the pier.`, 'bad');
     });
   }
   onShipBump(ship) { if (ship === this.sloop) { this.sfx.crash(0); this.ui.pickup('Ran aground'); this.shake(0.35); } }

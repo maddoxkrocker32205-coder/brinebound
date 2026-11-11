@@ -137,7 +137,7 @@ export class Crews {
     const G = this.g;
     if ((ship.kind === 'merchant' || ship.kind === 'navy') && !ship.reported) {
       ship.reported = true;
-      G.fleet.raise(ship.kind === 'navy' ? 2 : 1, ship.kind === 'navy' ? 'You boarded a navy cutter' : 'You boarded a merchantman');
+      G.fleet.raise(ship.kind === 'navy' ? 2 : 1, ship.kind === 'navy' ? 'You boarded a navy ship' : 'You boarded a merchantman');
     }
     ship.angryT = Math.max(ship.angryT || 0, 80);
     if (!ship.boardedOnce) { ship.boardedOnce = true; G.ui.pickup(`The ${FACTIONS[ship.kind].noun}s of the ${ship.name || 'ship'} draw steel`); }

@@ -1,4 +1,5 @@
 import { W, D, SEA, B, ITEMS } from './config.js';
+import { VESSELS, vesselProgress } from './shop.js';
 
 const STORY = [
   { id: 'landfall', title: 'Landfall' },
@@ -257,6 +258,26 @@ export class Quests {
       default: return { text: 'Take contracts from Old Mags and Brother Tallow' };
     }
   }
+  shipyardObjective() {
+    const G = this.g;
+    if (!this.flags.shipwrightIntro) {
+      return { title: 'The Shipwright’s Wager', id: 'shipwright', text: 'Talk to Old Mags after your first treasure haul to hear how the shipyard can be reopened' };
+    }
+    const next = VESSELS.find((vessel) => !G.ownedShips[vessel.id]);
+    if (!next) return { title: 'The Shipwright’s Legacy', id: 'shipwright', text: 'You have earned every hull in Old Mags’ fleet. The next voyage is yours to write' };
+    const progress = vesselProgress(G, next);
+    const tales = {
+      cutter: 'Mags will stake her name on a swift cutter for a captain who can make their mark',
+      brigantine: 'The old slip can launch a brigantine once your cutter has proven itself',
+      frigate: 'A frigate needs a proven captain, a deep purse, and a crew who trust your colors',
+    };
+    const qualified = progress.unlocked && G.ownedShips[next.requires];
+    return {
+      title: `${next.name} commission`,
+      id: 'shipwright',
+      text: `${tales[next.id]} ${qualified ? `Its charter is earned; save ${next.price} banked gold to commission it` : `Choose any route: ${progress.text}. One completed route earns its charter`}`,
+    };
+  }
   npcMarker(id) { const n = this.g.npcs.get(id); return n ? { x: n.site.x, z: n.site.z, icon: 'npc' } : null; }
 
   // ---------------------------------------------------------------- contracts
@@ -410,6 +431,7 @@ export class Quests {
   tracked_() {
     const crew = this.g.net && this.g.net.crewObjective();
     if (crew) return crew;
+    if (this.tracked === 'shipwright' && this.flags.shipwrightIntro) return this.shipyardObjective();
     if (this.tracked !== 'story') { const q = this.active.find((x) => x.id === this.tracked); if (q) return { title: q.title, ...this.contractObjective(q), id: q.id }; this.tracked = 'story'; }
     return { title: STORY[this.step].title, ...this.storyObjective(), id: 'story' };
   }
@@ -514,13 +536,22 @@ export class Quests {
   dialog(npc) {
     const G = this.g, st = this.id, ph = this.phase;
     const name = G.look.name;
-    const d = { npc, greeting: '', story: null, ready: [], offers: [], bank: npc === 'mags' && (G.gold > 0 || G.lootValue(G.inv) > 0), shop: npc === 'mags', rest: null };
+    const d = { npc, greeting: '', story: null, shipwright: null, ready: [], offers: [], bank: npc === 'mags' && (G.gold > 0 || G.lootValue(G.inv) > 0), shop: npc === 'mags', rest: null };
     if (npc === 'mags') {
       d.greeting = G.sky.isNight ? `Up late, ${name}? The Hollowmen walk at night. Keep to the lantern light.` : `Ahoy, ${name}. Gold is safer in my strongbox than in your pockets.`;
       if (st === 'landfall') d.greeting = `So you’re the new captain. Chop some wood, craft planks, then take that sloop out. I marked an X for you on ${this.iname(G.world.firstMap.island)}.`;
       if (st === 'firsthaul') d.greeting = ph === 0 ? `That X on ${this.iname(G.world.firstMap.island)} won’t dig itself. Gold first, then we talk.` : 'You found it! Hand it over before the Hollow Wake smells it on you.';
       if (st === 'oil' && ph === 0) d.story = { text: 'Brother Tallow has kept the Lantern Cay light for forty years, and he’s out of oil. Take him this crate. The light keeps the Hollowmen honest.', button: 'Take the crate of lamp oil', act: () => { this.give('oil'); this.phase = 1; } };
       if (st === 'home' && this.has('pearl')) d.story = { text: 'Is that... the pearl? Then the Deep One is gone, and the curse with it. I never thought I’d see the day.', button: 'Give Old Mags the kraken pearl', act: () => { this.take('pearl'); this.pay(800, 'Old Mags trades the pearl for 800 gold.'); this.advance(); } };
+      if (this.step >= 2) {
+        d.shipwright = this.flags.shipwrightIntro
+          ? { text: this.shipyardObjective().text, button: 'Visit the shipyard', act: () => G.openSheet('shop', { npc: 'mags' }) }
+          : {
+            text: 'Mags once lost her brother’s cutter to the Hollow Wake. She has kept the shipwright’s slip closed ever since. Prove your captaincy through the story, contracts, exploration, or combat, and she will vouch for a stronger hull.',
+            button: 'Take the Shipwright’s Wager',
+            act: () => { this.flags.shipwrightIntro = true; this.tracked = 'shipwright'; G.sfx.bell(); G.ui.toast('The Shipwright’s Wager', 'Story, contracts, exploration, or combat can each earn a ship charter.', 'chapter'); G.autosave('shipwright', true); },
+          };
+      }
       d.rest = G.sky.isNight ? { label: 'Rest until morning', act: () => G.skipTo('day') } : null;
     } else {
       d.greeting = this.flags.lit ? `The light holds, ${name}. Bless your oil.` : 'The lamp is cold. Without oil, the dead wander closer every night.';

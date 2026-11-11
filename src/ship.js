@@ -35,6 +35,40 @@ export const SHIP_NAMES = {
   pirate: ['The Red Gull', 'The Black Maren', 'The Gallows Wit', 'The Rusty Hook'],
 };
 
+export const SHIP_DESIGNS = {
+  sloop: [{ id: 'sloop', label: 'Sloop', speed: 14, hp: 120, guns: 2, turn: 1, sailWidth: 4.9, sailHeight: 4.8 }],
+  merchant: [
+    { id: 'merchantman', label: 'Merchantman', speed: 9.5, hp: 105, guns: 2, turn: 0.82, sailWidth: 5.1, sailHeight: 4.5, foremast: true },
+    { id: 'packet', label: 'Packet ship', speed: 12.5, hp: 78, guns: 1, turn: 1.2, sailWidth: 5.3, sailHeight: 4.4 },
+  ],
+  navy: [
+    { id: 'frigate', label: 'Frigate', speed: 10.5, hp: 180, guns: 3, turn: 0.78, sailWidth: 5.1, sailHeight: 4.7, foremast: true },
+    { id: 'cutter', label: 'Cutter', speed: 14, hp: 128, guns: 2, turn: 1.25, sailWidth: 4.4, sailHeight: 5.1 },
+  ],
+  pirate: [
+    { id: 'brig', label: 'Brig', speed: 11.2, hp: 130, guns: 3, turn: 0.9, sailWidth: 5, sailHeight: 4.7, foremast: true },
+    { id: 'raider', label: 'Raider', speed: 14, hp: 92, guns: 2, turn: 1.2, sailWidth: 4.6, sailHeight: 4.9 },
+  ],
+  hollow: [
+    { id: 'wraith', label: 'Wraith ship', speed: 11.4, hp: 110, guns: 2, turn: 0.95, sailWidth: 4.9, sailHeight: 4.8 },
+    { id: 'dreadship', label: 'Dreadship', speed: 10.2, hp: 260, guns: 3, turn: 0.8, sailWidth: 5.1, sailHeight: 4.8, foremast: true },
+  ],
+};
+export const PLAYER_VESSELS = [
+  { id: 'sloop', label: 'Sloop', speed: 14, hp: 120, guns: 2, turn: 1, sailWidth: 4.9, sailHeight: 4.8 },
+  { id: 'cutter', label: 'Cutter', speed: 15.5, hp: 155, guns: 2, turn: 1.28, sailWidth: 4.4, sailHeight: 4.8 },
+  { id: 'brigantine', label: 'Brigantine', speed: 12.8, hp: 215, guns: 3, turn: 1, sailWidth: 5, sailHeight: 4.8, foremast: true },
+  { id: 'frigate', label: 'Frigate', speed: 10.5, hp: 285, guns: 3, turn: 0.78, sailWidth: 5.1, sailHeight: 4.7, foremast: true },
+];
+export function playerVessel(id = 'sloop') {
+  return PLAYER_VESSELS.find((v) => v.id === id) || PLAYER_VESSELS[0];
+}
+export function shipDesignFor(kind, nameIx = 0, variant = 'normal') {
+  const designs = SHIP_DESIGNS[kind] || SHIP_DESIGNS.sloop;
+  if (kind === 'hollow') return variant === 'flagship' ? designs[1] : designs[0];
+  return designs[Math.abs(nameIx | 0) % designs.length];
+}
+
 function shadeHex(hex, k) { const c = new THREE.Color(hex); c.multiplyScalar(k); return c; }
 
 // The hull is lofted, not stacked: cross-sections from keel to rail at stations along the length, with a
@@ -154,20 +188,77 @@ export function gunPlace(g) {
 }
 
 // ---------------------------------------------------------------- collisions
-// The hull's footprint for bumping into things: circles down the centreline, as wide as the hull is there, so
-// ships can lie alongside each other and a bow can strike a side. In plan units ([z, radius]); times the size.
-export const HULL_CIRCLES = [-5.45, -4.1, -2.6, -1.0, 0.6, 2.2, 3.8, 5.0].map((z) => [z, Math.max(0.55, halfWidthAt1(z) * (z < -4 ? 0.92 : 1))]);
-// points round the hull's outline at the waterline, about 0.45 plan units apart, for running aground
-const OUTLINE = (() => {
-  const pts = [[0, SHIP1.bow + 0.35]];
-  for (let z = SHIP1.bow + 0.8; z <= SHIP1.stern - 0.25; z += 0.45) { const w = halfWidthAt1(z) * 0.96; pts.push([w, z], [-w, z]); }
-  for (let x = -1.4; x <= 1.4; x += 0.45) pts.push([x, SHIP1.stern - 0.15]);
-  for (let z = SHIP1.bow + 1.5; z <= SHIP1.stern - 0.8; z += 1.4) pts.push([0, z]);   // and down the keel, for anything poking up inside
-  return pts;
+// The collision profile follows the actual hull skin at the waterline rather than a chain of
+// overlapping circles. Convexifying the sampled cross-section keeps SAT reliable at the bow.
+const HULL_FOOTPRINT = (() => {
+  const pts = [], steps = 56;
+  for (let i = 0; i <= steps; i++) {
+    const z = SHIP1.bow + (SHIP1.stern - SHIP1.bow) * (i / steps), x = hullHalfAt1(z, 0.12);
+    pts.push([x, z], [-x, z]);
+  }
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const turn = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const lower = [], upper = [];
+  for (const p of pts) {
+    while (lower.length > 1 && turn(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (upper.length > 1 && turn(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
 })();
 
+function polygonContact(a, b) {
+  let depth = Infinity, nx = 0, nz = 0;
+  const test = (points) => {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i], q = points[(i + 1) % points.length], ex = q[0] - p[0], ez = q[1] - p[1], len = Math.hypot(ex, ez);
+      if (len < 1e-8) continue;
+      const ax = -ez / len, az = ex / len;
+      let amin = Infinity, amax = -Infinity, bmin = Infinity, bmax = -Infinity;
+      for (const v of a) { const d = v[0] * ax + v[1] * az; amin = Math.min(amin, d); amax = Math.max(amax, d); }
+      for (const v of b) { const d = v[0] * ax + v[1] * az; bmin = Math.min(bmin, d); bmax = Math.max(bmax, d); }
+      const plus = amax - bmin, minus = bmax - amin;
+      if (plus <= 0 || minus <= 0) return false;
+      if (plus < depth) { depth = plus; nx = ax; nz = az; }
+      if (minus < depth) { depth = minus; nx = -ax; nz = -az; }
+    }
+    return true;
+  };
+  if (!test(a) || !test(b)) return null;
+  let ax = 0, az = 0, bx = 0, bz = 0, an = 0, bn = 0, amax = -Infinity, bmin = Infinity;
+  for (const p of a) amax = Math.max(amax, p[0] * nx + p[1] * nz);
+  for (const p of b) bmin = Math.min(bmin, p[0] * nx + p[1] * nz);
+  for (const p of a) if (amax - (p[0] * nx + p[1] * nz) < 0.03) { ax += p[0]; az += p[1]; an++; }
+  for (const p of b) if ((p[0] * nx + p[1] * nz) - bmin < 0.03) { bx += p[0]; bz += p[1]; bn++; }
+  return { depth, nx, nz, x: (ax / an + bx / bn) * 0.5, z: (az / an + bz / bn) * 0.5 };
+}
+
+function footprintAxes(points, out) {
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i], q = points[(i + 1) % points.length], dx = q[0] - p[0], dz = q[1] - p[1], len = Math.hypot(dx, dz) || 1;
+    const ax = -dz / len, az = dx / len;
+    let min = Infinity, max = -Infinity;
+    for (const v of points) { const d = v[0] * ax + v[1] * az; min = Math.min(min, d); max = Math.max(max, d); }
+    const axis = out[i] || (out[i] = [0, 0, 0, 0]);
+    axis[0] = ax; axis[1] = az; axis[2] = min; axis[3] = max;
+  }
+}
+
+function footprintTouchesCell(axes, bx, bz) {
+  const cx = bx + 0.5, cz = bz + 0.5;
+  for (const [ax, az, min, max] of axes) {
+    const center = cx * ax + cz * az, radius = 0.5 * (Math.abs(ax) + Math.abs(az));
+    if (max < center - radius - 1e-5 || min > center + radius + 1e-5) return false;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------- the hull, decks and fittings
-function buildHull(gb, pal) {
+function buildHull(gb, pal, design) {
   const hull = pal.hull, hull2 = pal.hull2 || shadeHex(pal.hull, 0.78);
   const NT = 14, NR = 3, TOP = NT + NR;
   // stations along the length, with the places where something starts or stops among them
@@ -220,6 +311,23 @@ function buildHull(gb, pal) {
       tri(a, na, uvAt(i, j), b, nb, uvAt(i + 1, j), c, nc, uvAt(i, j + 1));
       tri(c, nc, uvAt(i, j + 1), b, nb, uvAt(i + 1, j), d, nd, uvAt(i + 1, j + 1));
     }
+  }
+  // Fine strakes and fasteners catch the light across the otherwise broad hull planks.
+  const strake = shadeHex(pal.hull, 0.66), levels = [0.25, 0.43, 0.61, 0.79];
+  for (const side of [-1, 1]) for (const t of levels) {
+    const point = (z, v) => {
+      const y = keelY(z) + (baseRail(z) - keelY(z)) * v;
+      return [side * (hullHalfAt1(z, y) + 0.012), y, z];
+    };
+    for (let i = 0; i < NZ; i++) {
+      const za = zs[i], zb = zs[i + 1], a = point(za, t - 0.008), b = point(zb, t - 0.008), c = point(za, t + 0.008), d = point(zb, t + 0.008);
+      gb.quad(a, b, c, d, [side, 0, 0], strake, T.hullwood, [za, 0], [zb, 0], [za, 1], [zb, 1]);
+    }
+  }
+  gb.round = 0;
+  for (const side of [-1, 1]) for (const t of [0.34, 0.7]) for (let z = -4.8; z < 5.3; z += 1.4) {
+    const y = keelY(z) + (baseRail(z) - keelY(z)) * t, x = side * (hullHalfAt1(z, y) + 0.025), r = 0.025;
+    gb.box(Math.min(x, x + side * 0.025), y - r, z - r, Math.max(x, x + side * 0.025), y + r, z + r, '#b78d52');
   }
   // the hold is lined with planks on the inside, so you never see the paint on the outside of the hull
   { const ys = [SHIP1.low, -0.45, -0.15, 0.2, 0.55, SHIP1.deck - 0.08], lin = shadeHex(pal.deck, 0.62);
@@ -339,9 +447,18 @@ function buildHull(gb, pal) {
   // the mast through every deck, its yards, the bowsprit
   gb.round = 0.05;
   gb.cyl(0, SHIP1.low, SHIP1.mastZ, 0, SHIP1.top, SHIP1.mastZ, 0.21, 0.12, pal.mast, T.log_side, 12);
-  gb.cyl(-2.7, 9.12, SHIP1.mastZ, 2.7, 9.12, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
-  gb.cyl(-2.3, 2.9, SHIP1.mastZ, 2.3, 2.9, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
+  const yard = (design.sailWidth + 0.5) / 2;
+  gb.cyl(-yard, 9.12, SHIP1.mastZ, yard, 9.12, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
+  gb.cyl(-yard * 0.85, 2.9, SHIP1.mastZ, yard * 0.85, 2.9, SHIP1.mastZ, 0.1, 0.1, pal.mast, T.log_side, 8);
   gb.cyl(0, 1.5, SHIP1.bow + 0.4, 0, 1.75, -8.4, 0.13, 0.07, pal.mast, T.log_side, 8);
+  if (design.foremast) {
+    const fz = -5.6;
+    gb.cyl(0, 1.25, fz, 0, 7.55, fz, 0.14, 0.1, pal.mast, T.log_side, 10);
+    gb.cyl(-1.75, 7.1, fz, 1.75, 7.1, fz, 0.08, 0.08, pal.mast, T.log_side, 8);
+    gb.cyl(-1.35, 3.8, fz, 1.35, 3.8, fz, 0.07, 0.07, pal.mast, T.log_side, 8);
+    gb.cyl(0, 7.5, fz, 0, 9.2, SHIP1.mastZ, 0.035, 0.035, pal.mast, T.log_side, 6);
+    gb.cyl(0, 1.55, fz, 0, 1.75, -8.4, 0.055, 0.055, pal.mast, T.log_side, 6);
+  }
   // a ladder up the back of the mast, and the crow's nest it leads to
   gb.round = 0.015;
   const lz = SHIP1.mastZ + 0.24;
@@ -493,7 +610,9 @@ export class Ship {
   constructor(scene, kind, opts = {}) {
     this.scene = scene; this.kind = kind; this.variant = opts.variant || 'normal';
     this.faction = kind === 'sloop' ? 'crew' : kind;
-    if (SHIP_NAMES[kind]) this.name = opts.name || SHIP_NAMES[kind][(opts.nameIx ?? (Math.random() * 99) | 0) % SHIP_NAMES[kind].length];
+    this.nameIx = opts.nameIx ?? (opts.name && SHIP_NAMES[kind] ? Math.max(0, SHIP_NAMES[kind].indexOf(opts.name)) : (Math.random() * 99) | 0);
+    if (SHIP_NAMES[kind]) this.name = opts.name || SHIP_NAMES[kind][this.nameIx % SHIP_NAMES[kind].length];
+    this.design = kind === 'sloop' ? playerVessel(opts.playerVessel) : shipDesignFor(kind, this.nameIx, this.variant);
     this.nid = ++NID; this.remote = null;
     this.size = SCALE;   // the flagship stands out by her flags, guns and hull, not her size: everyone walks the same plan
     this.group = new THREE.Group();
@@ -502,10 +621,10 @@ export class Ship {
     scene.add(this.group);
     this.pos = new THREE.Vector3(0, WATER_Y, 0);
     this.heading = 0; this.speed = 0; this.sailLvl = 0; this.rudder = 0; this.reverse = false;
-    this.baseSpeed = kind === 'sloop' ? 14 : kind === 'merchant' ? 10 : kind === 'navy' ? 12.6 : 11.4;
+    this.baseSpeed = this.design.speed; this.turnMul = this.design.turn;
     this.maxSpeed = this.baseSpeed; this.speedMul = 1; this.hold = 1;
-    this.maxHp = kind === 'sloop' ? 120 : kind === 'merchant' ? 90 : kind === 'navy' ? 150 : 110; this.hp = this.maxHp;
-    this.guns = this.variant === 'flagship' ? 3 : 2; this.dmgMul = 1; this.reloadMul = 1;
+    this.maxHp = this.design.hp; this.hp = this.maxHp;
+    this.guns = this.design.guns; this.dmgMul = 1; this.reloadMul = 1; this.armorMul = 1;
     this.sinking = false; this.sinkT = 0; this.cool = { port: 0, star: 0 };
     this.pitch = 0; this.roll = 0; this.bumpCD = 0; this.smokeT = 0; this.wakeT = 0; this.wf = 1;
     this.build(opts.look);
@@ -528,7 +647,7 @@ export class Ship {
       pal.name = L.ship || 'The Salt Wren';
     } else if (kind === 'hollow') pal.emblem = 'Skull';
     else { pal.name = this.name || SHIP_NAMES[kind][0]; pal.emblem = base.emblem; }
-    const gb = new GeoBuilder(); buildHull(gb, pal);
+    const gb = new GeoBuilder(); buildHull(gb, pal, this.design);
     this.hullHex = new THREE.Color(pal.hull || '#6b4426').getHex();
     if (kind === 'hollow') {
       for (let i = 0; i < 9; i++) { const z = -4.5 + i * 1.1, s = i % 2 ? 1 : -1, w = halfWidthAt1(z); gb.box(s * w - 0.06, -0.6 - (i % 3) * 0.2, z, s * w + 0.06, 0.9, z + 0.25, '#3f6b45'); }
@@ -551,9 +670,15 @@ export class Ship {
     mask.renderOrder = 1;
     this.body.add(mask);
     const sailMat = new THREE.MeshLambertMaterial({ map: sailTexture(pal.sail, pal.emblem, kind === 'hollow', 3), side: THREE.DoubleSide, transparent: kind === 'hollow', alphaTest: kind === 'hollow' ? 0.4 : 0 });
-    this.sail = new THREE.Mesh(sailGeo(4.9, 4.8), sailMat);
+    this.sail = new THREE.Mesh(sailGeo(this.design.sailWidth, this.design.sailHeight), sailMat);
     this.sail.position.set(0, 9.0, -0.85); this.sail.castShadow = true;
     this.body.add(this.sail);
+    this.foreSail = null;
+    if (this.design.foremast) {
+      this.foreSail = new THREE.Mesh(sailGeo(3.4, 3.5), sailMat);
+      this.foreSail.position.set(0, 7.1, -5.6); this.foreSail.castShadow = true;
+      this.body.add(this.foreSail);
+    }
     const jg = new THREE.BufferGeometry();
     jg.setAttribute('position', new THREE.Float32BufferAttribute([0, 8.6, -0.75, 0, 1.75, -8.2, 0, 1.8, -5.5], 3));
     jg.setAttribute('uv', new THREE.Float32BufferAttribute([0.5, 1, 0, 0, 1, 0], 2));
@@ -601,33 +726,44 @@ export class Ship {
     const k = this.size, lx = (dx * c - dz * s) / k, lz = (dx * s + dz * c) / k, ly = (y - this.pos.y) / k;
     return ly > -1.7 && ly < (lz > SHIP1.qdZ ? 3.2 : 2.6) && lz > SHIP1.bow - 0.4 && lz < SHIP1.stern + 0.4 && Math.abs(lx) < halfWidthAt1(lz) + 0.35;
   }
+  hullOutline(out = this.footprint || (this.footprint = HULL_FOOTPRINT.map(() => [0, 0]))) {
+    const c = Math.cos(this.heading), s = Math.sin(this.heading), k = this.size;
+    for (let i = 0; i < HULL_FOOTPRINT.length; i++) {
+      const [x, z] = HULL_FOOTPRINT[i];
+      out[i][0] = this.pos.x + (x * c + z * s) * k;
+      out[i][1] = this.pos.z + (-x * s + z * c) * k;
+    }
+    return out;
+  }
+  hullContact(other) { return polygonContact(this.hullOutline(), other.hullOutline()); }
   windFactor(wind) {
     const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
     const dot = fx * Math.cos(wind.angle) + fz * Math.sin(wind.angle);
     return 0.45 + 0.55 * (dot + 1) / 2;
   }
   // Where the hull would touch land with its centre at (x, z) and heading h: the middle of the touching points
-  // round the outline (null when clear). Two blocks of water under the keel are enough to float.
+  // round the outline (null when clear). Each occupied terrain cell is tested against the hull footprint.
   groundContact(world, x, z, h) {
-    const c = Math.cos(h), s = Math.sin(h), k = this.size;
+    const poly = this.hullOutline(), axes = this.landAxes || (this.landAxes = HULL_FOOTPRINT.map(() => [0, 0, 0, 0]));
+    const dh = wrapAngle(h - this.heading), ch = Math.cos(dh), sh = Math.sin(dh);
+    for (const p of poly) {
+      const lx = p[0] - this.pos.x, lz = p[1] - this.pos.z;
+      p[0] = x + lx * ch + lz * sh;
+      p[1] = z - lx * sh + lz * ch;
+    }
+    footprintAxes(poly, axes);
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const p of poly) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]); }
     let n = 0, sx = 0, sz = 0;
-    for (const [lx0, lz0] of OUTLINE) {
-      const lx = lx0 * k, lz = lz0 * k, wx = x + lx * c + lz * s, wz = z - lx * s + lz * c;
-      const bx = Math.floor(wx), bz = Math.floor(wz);
-      if (world.solid(bx, SEA - 1, bz) || world.solid(bx, SEA, bz)) { n++; sx += wx; sz += wz; }
+    for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
+      if ((world.solid(bx, SEA - 1, bz) || world.solid(bx, SEA, bz)) && footprintTouchesCell(axes, bx, bz)) { n++; sx += bx + 0.5; sz += bz + 0.5; }
     }
     return n ? { n, x: sx / n, z: sz / n } : null;
   }
   hullHits(world, x, z, h) { return !!this.groundContact(world, x, z, h); }
-  // the hull's collision circles in the world, [x, z, radius] each
-  hullCircles(out = this.circ || (this.circ = HULL_CIRCLES.map(() => [0, 0, 0]))) {
-    const s = Math.sin(this.heading), c = Math.cos(this.heading), k = this.size;
-    for (let i = 0; i < HULL_CIRCLES.length; i++) { const [z, r] = HULL_CIRCLES[i]; out[i][0] = this.pos.x + z * k * s; out[i][1] = this.pos.z + z * k * c; out[i][2] = r * k; }
-    return out;
-  }
   damage(n, G) {
     if (this.sinking) return;
-    this.hp -= n;
+    this.hp -= n * this.armorMul;
     if (this.hp <= 0) { this.hp = 0; this.sinking = true; this.sinkT = 0; this.speed = 0; G.onShipSunk(this); }
   }
   // where gun i's muzzle is in the world, and the way it points
@@ -700,7 +836,7 @@ export class Ship {
     let target = this.preview ? 0 : this.maxSpeed * this.speedMul * this.sailLvl * this.wf * stormBoost * this.hold;
     if (this.reverse) target = -1.6 * this.hold;
     this.speed += (target - this.speed) * Math.min(1, dt * (target > this.speed ? 0.38 : 0.65));
-    const turn = this.rudder * (0.2 + 0.5 * Math.min(1, Math.abs(this.speed) / 6)) * (this.speed < -0.1 ? -1 : 1) / Math.sqrt(this.size);
+    const turn = this.rudder * (0.2 + 0.5 * Math.min(1, Math.abs(this.speed) / 6)) * (this.speed < -0.1 ? -1 : 1) * this.turnMul / Math.sqrt(this.size);
     const prevH = this.heading, w = G.world;
     const turnH = this.heading - turn * dt;
     const step = (h) => [this.pos.x - Math.sin(h) * this.speed * dt, this.pos.z - Math.cos(h) * this.speed * dt];
@@ -751,7 +887,7 @@ export class Ship {
     if (!atHelm) { this.rudder = r.rudder; this.sailLvl = r.sail; }
     this.wf = this.windFactor(G.wind);
     if (this.kind === 'hollow') this.wf = Math.max(this.wf, 0.8);
-    const turnOf = (rud, sp) => rud * (0.2 + 0.5 * Math.min(1, Math.abs(sp) / 6)) * (sp < -0.1 ? -1 : 1) / Math.sqrt(this.size);
+    const turnOf = (rud, sp) => rud * (0.2 + 0.5 * Math.min(1, Math.abs(sp) / 6)) * (sp < -0.1 ? -1 : 1) * this.turnMul / Math.sqrt(this.size);
     const prevH = this.heading;
     this.speed = r.speed;
     this.heading -= turnOf(this.rudder, this.speed) * dt;
@@ -771,6 +907,10 @@ export class Ship {
   showSail(level) {
     this.sail.scale.y = 0.1 + 0.9 * level;
     this.sail.scale.z = (0.15 + 0.85 * this.wf) * (0.25 + 0.75 * level);
+    if (this.foreSail) {
+      this.foreSail.scale.y = 0.1 + 0.9 * level;
+      this.foreSail.scale.z = (0.15 + 0.85 * this.wf) * (0.25 + 0.75 * level);
+    }
     this.jib.visible = level > 0.25;
   }
   applyTransform() {
