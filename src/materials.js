@@ -1,8 +1,18 @@
 import * as THREE from 'three';
-import { EMIT_START } from './config.js';
+import { EMIT_START, T } from './config.js';
 
 // One texture array + a small Lambert patch shared by terrain, plants, ships and characters.
 export const shared = { tex: null, detail: null, frond: null, time: { value: 0 } };
+const RELIEF_NORMAL = `vec3 brineReliefNormal(vec3 surfPos, vec3 surfNorm, float height, float scale) {
+  vec3 sigmaX = dFdx(surfPos);
+  vec3 sigmaY = dFdy(surfPos);
+  vec3 r1 = cross(sigmaY, surfNorm);
+  vec3 r2 = cross(surfNorm, sigmaX);
+  float det = dot(sigmaX, r1);
+  if (abs(det) < 1e-6) return surfNorm;
+  vec3 grad = sign(det) * (dFdx(height) * r1 + dFdy(height) * r2);
+  return normalize(abs(det) * surfNorm - scale * grad);
+}`;
 
 export function voxelMaterial({ cutout = false, sway = false, side = THREE.DoubleSide, emissive = 0x000000 } = {}) {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side, emissive, roughness: 0.88, metalness: 0.025 });
@@ -24,14 +34,24 @@ transformed.z += cos(uTime * 1.3 + position.z * 0.71 + position.x * 0.2) * 0.07 
       .replace('#include <common>', `#include <common>
 uniform highp sampler2DArray uTex;
 varying vec2 vTuv;
-varying float vLayer;`)
+varying float vLayer;
+${RELIEF_NORMAL}`)
       .replace('#include <map_fragment>', `vec4 texel = texture(uTex, vec3(vTuv, floor(vLayer + 0.5)));
 diffuseColor *= texel;
 ${cutout ? 'if (diffuseColor.a < 0.5) discard;' : ''}`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 roughnessFactor = clamp(roughnessFactor + (dot(texel.rgb, vec3(0.299, 0.587, 0.114)) - 0.5) * 0.12, 0.7, 1.0);`)
       .replace('#include <normal_fragment_begin>', cutout ? `#include <normal_fragment_begin>
-normal = normalize(vNormal);` : '#include <normal_fragment_begin>')
+normal = normalize(vNormal);` : `#include <normal_fragment_begin>
+float reliefScale = 0.22;
+if (abs(vLayer - ${T.plank}.0) < 0.5 || abs(vLayer - ${T.wreckwood}.0) < 0.5 ||
+    abs(vLayer - ${T.log_side}.0) < 0.5 || abs(vLayer - ${T.hullwood}.0) < 0.5) reliefScale = 0.38;
+else if (abs(vLayer - ${T.brick}.0) < 0.5 || abs(vLayer - ${T.whitebrick}.0) < 0.5 ||
+         abs(vLayer - ${T.mossbrick}.0) < 0.5 || abs(vLayer - ${T.slate}.0) < 0.5 ||
+         abs(vLayer - ${T.stone}.0) < 0.5 || abs(vLayer - ${T.bone}.0) < 0.5) reliefScale = 0.32;
+else if (abs(vLayer - ${T.cloth}.0) < 0.5) reliefScale = 0.42;
+float reliefHeight = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+normal = brineReliefNormal(-vViewPosition, normalize(normal), reliefHeight, reliefScale);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 if (vLayer > ${EMIT_START}.0 - 0.5) totalEmissiveRadiance += texel.rgb * 1.15;`);
   };
@@ -72,7 +92,8 @@ varying vec3 vCol2;
 varying vec4 vDet;
 varying float vGlow;
 varying vec3 vWPos;
-varying vec3 vWNor;`)
+varying vec3 vWNor;
+${leaf ? '' : RELIEF_NORMAL}`)
       .replace('void main() {', leaf ? 'void main() {' : `void main() {
 if (!gl_FrontFacing) { gl_FragColor = vec4(0.035, 0.03, 0.026, 1.0); return; }`)
       .replace('#include <color_fragment>', `
@@ -87,6 +108,8 @@ float det = dot(dd, w) / max(0.001, w.r + w.g + w.b + w.a);
 float macro = texture2D(uDetail, vWPos.xz * 0.019).a;
 vec3 base = mix(vCol2, vColor.rgb, top);
 diffuseColor.rgb *= base * (0.6 + 0.66 * det) * (0.86 + 0.28 * macro);`)
+      .replace('#include <normal_fragment_begin>', leaf ? '#include <normal_fragment_begin>' : `#include <normal_fragment_begin>
+normal = brineReliefNormal(-vViewPosition, normalize(normal), det, 0.22);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += base * vGlow * (0.9 + 0.5 * det);`);
   };

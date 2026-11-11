@@ -21,6 +21,35 @@ async def main():
             }}''')
             assert world == {'map': [1824, 1824], 'islands': 54, 'extended': 8, 'villages': 24, 'ruins': 8, 'settledExtended': 8}, world
             print('expanded settlements', world)
+            access = await page.evaluate(f'''() => {{
+              const w = {G}.world, failures = [];
+              for (const s of w.sites.structures.filter((q) => q.type === 'house')) {{
+                const x = Math.floor(s.doorX), z = Math.floor(s.doorZ);
+                for (let dx = -1; dx <= 1; dx++) for (let dy = 0; dy < 2; dy++) {{
+                  if (w.solid(x + dx, s.floor + dy, z)) failures.push([s.role, x + dx, s.floor + dy, z]);
+                }}
+                if (w.solid(s.x, s.floor, s.z) || w.solid(s.x, s.floor + 1, s.z)) failures.push([s.role, 'interior', s.x, s.floor, s.z]);
+              }}
+              const outpost = w.structureDetails.find((q) => q.type === 'outpost');
+              if (!outpost || !w.solid(outpost.x + 2, outpost.g + 2, outpost.z + 2) ||
+                  !w.solid(outpost.x + 2, outpost.g + 1, outpost.z + 2)) failures.push(['outpost lamp', outpost]);
+              const dock = w.dock, shoreX = Math.round(dock.x - 17), shoreZ = Math.round(dock.z - 7);
+              const coveEdges = [[shoreX + 16, shoreZ - 3], [shoreX + 16, shoreZ + 20]];
+              const blockedWater = coveEdges.filter(([x, z]) => w.dryColumn(x, z));
+              if (blockedWater.length) failures.push(['dock cove', blockedWater]);
+              const s = w.sites.structures[0], wallZ = Math.floor(s.doorZ), startZ = wallZ + 1.5;
+              w.buildNear(s.doorX, s.z, 32);
+              const threshold = w.walkStep(s.doorX, s.floor, startZ, s.doorX, startZ - 1);
+              const inside = Number.isNaN(threshold) ? threshold : w.walkStep(s.doorX, threshold, startZ - 1, s.doorX, startZ - 2);
+              const cs = 16, nc = w.bw / cs, key = Math.floor(outpost.x / cs) + Math.floor(outpost.z / cs) * nc;
+              w.buildChunk(key);
+              const details = w.meshes.get(key + ':a');
+              return {{ houses: w.sites.structures.length, failures, walkable: !Number.isNaN(threshold) && !Number.isNaN(inside),
+                dockWaterCells: coveEdges.length - blockedWater.length,
+                outpostDetailVertices: details?.geometry.attributes.position.count || 0 }};
+            }}''')
+            assert access['houses'] > 0 and not access['failures'] and access['walkable'] and access['dockWaterCells'] == 2 and access['outpostDetailVertices'] > 0, access
+            print('house access, anchored outpost lantern and detail mesh', access)
             support = await page.evaluate(f'''() => {{
               const w = {G}.world, missing = [];
               const check = (kind, x, z, baseY) => {{

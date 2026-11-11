@@ -1,6 +1,6 @@
 # Brinebound: hand-off guide
 
-Version 0.6.34. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
+Version 0.6.38. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
 
 ## Starter prompt
 
@@ -143,6 +143,10 @@ The game was built and published inside the Claude app, which gives the page a `
 
 ## Version history
 
+- **0.6.38:** replace the rectangular outpost cut with a curving, widening dock inlet and a sloped sandy edge.
+- **0.6.37:** fix the terrain relief shader placement so island ground renders instead of disappearing.
+- **0.6.36:** add light-reactive relief shading to block materials and bevel generated structure details to give timber, stone and cloth surfaces more depth.
+- **0.6.35:** add layered roof and timber details across generated structures, widen house entrances for player clearance, anchor decorative lanterns to supports, and shape the outpost canopy.
 - **0.6.34:** add an Ultra graphics preset with 4K shadows and longer view distance; Auto starts at High on desktop and keeps the Low default on touch devices.
 - **0.6.33:** remove tree foliage left detached by later structure placement while preserving normal ruin placement.
 - **0.6.32:** add terrain-to-foundation supports for settlements, camps and ruins; re-anchor tree roots after later structure placement, and keep palm fronds and bone arches connected to their supports.

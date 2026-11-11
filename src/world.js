@@ -46,11 +46,6 @@ function toGeometry(Q) {
   g.setIndex(Q.ind);
   return g;
 }
-rawRoof(x, y, z, id) {
-  if (!this.inside(x, y, z)) return;
-  this.raw(x, y, z, id);
-  if (id !== B.AIR) this.hiddenRoofCells.add(x + W * (z + D * y));
-}
 const lin = (hex) => { _c.setHex(hex); return [_c.r, _c.g, _c.b]; };
 // ground colours (top, side), detail mix (sand, grass, rock, dirt) and glow
 const TM = [];
@@ -124,6 +119,11 @@ export class World {
       this.data[i] = id;
       if (this.treeFoliage && CANOPY[id]) this.treeFoliage.add(i);
     }
+  }
+  rawRoof(x, y, z, id) {
+    if (!this.inside(x, y, z)) return;
+    this.raw(x, y, z, id);
+    if (id !== B.AIR) this.hiddenRoofCells.add(x + W * (z + D * y));
   }
   set(x, y, z, id, record = true) {
     if (!this.inside(x, y, z) || y < FLOOR) return false;
@@ -313,6 +313,11 @@ export class World {
     this.moreIslands();
     this.frontierIslands();
     this.extendedIslands();
+    for (const s of this.sites.structures) {
+      if (s.type !== 'house') continue;
+      const x = Math.floor(s.doorX), z = Math.floor(s.doorZ);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = 0; dy < 2; dy++) this.raw(x + dx, s.floor + dy, z, B.AIR);
+    }
     this.anchorTreeRoots();
     this.pruneDetachedFoliage();
     this.treeFoliage = null;
@@ -350,9 +355,23 @@ export class World {
     let sx = Math.round(o.x);
     while (sx < W - 30 && this.surf[sx + zc * W] > SEA) sx++;
     const px0 = sx - 4, px1 = sx + 22;
-    for (let x = sx; x <= sx + 42; x++) for (let z = zc + 2; z <= zc + 15; z++) {
-      for (let y = SEA - 4; y < H; y++) this.raw(x, y, z, B.AIR);
-      if (this.surf[x + z * W] > SEA - 4) this.surf[x + z * W] = SEA - 4;
+    // Cut a curved, widening inlet so the dock opens into the sea instead of a rectangular basin.
+    for (let x = sx; x <= sx + 54; x++) {
+      const along = (x - sx) / 54;
+      const centerZ = zc + 7 + Math.sin(along * 4.8) * 1.4 + Math.sin(along * 10.4) * 0.55;
+      const halfWidth = 7 + 8 * smooth(0.06, 0.72, along) + Math.sin(along * 8) * 0.65;
+      const start = smooth(0, 8, x - sx);
+      for (let z = Math.floor(centerZ - halfWidth - 4); z <= Math.ceil(centerZ + halfWidth + 4); z++) {
+        if (!this.inside(x, 0, z)) continue;
+        const edge = smooth(halfWidth - 4, halfWidth + 4, Math.abs(z - centerZ));
+        const carve = start * (1 - edge), i = x + z * W, original = this.surf[i];
+        if (original <= SEA - 4 || carve < 0.01) continue;
+        const level = Math.round(original + (SEA - 4 - original) * carve);
+        if (level >= original) continue;
+        for (let y = level; y < H; y++) this.raw(x, y, z, B.AIR);
+        if (level > FLOOR) this.raw(x, level - 1, z, B.SAND);
+        this.surf[i] = level;
+      }
     }
     for (let x = px0; x <= px1; x++) for (let z = zc - 1; z <= zc + 1; z++) {
       for (let y = SEA + 1; y < H; y++) this.raw(x, y, z, B.AIR);
@@ -371,13 +390,14 @@ export class World {
     }
     for (let x = stx - 2; x <= stx + 2; x++) for (let z = stz - 2; z <= stz + 2; z++) this.raw(x, g - 1, z, B.PLANK);
     for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) for (let y = g; y < g + 3; y++) this.raw(stx + dx, y, stz + dz, B.LOG);
-    for (let x = stx - 3; x <= stx + 3; x++) for (let z = stz - 3; z <= stz + 3; z++) this.raw(x, g + 3, z, B.PLANK);
-    for (let x = stx - 2; x <= stx + 2; x++) for (let z = stz - 1; z <= stz + 1; z++) this.raw(x, g + 4, z, B.CLOTH);
+    for (let x = stx - 3; x <= stx + 3; x++) for (let z = stz - 3; z <= stz + 3; z++) this.rawRoof(x, g + 3, z, B.PLANK);
+    for (let x = stx - 2; x <= stx + 2; x++) for (let z = stz - 1; z <= stz + 1; z++) this.rawRoof(x, g + 4, z, B.CLOTH);
     for (let x = stx - 1; x <= stx + 1; x++) this.raw(x, g, stz + 2, B.PLANK);
     for (let x = stx - 1; x <= stx + 1; x++) for (let y = g; y < g + 2; y++) this.raw(x, y, stz - 2, B.PLANK);
     this.raw(stx + 3, g, stz + 1, B.LOG); this.raw(stx + 3, g, stz, B.PLANK); this.raw(stx + 3, g + 1, stz + 1, B.PLANK);
     this.raw(stx - 3, g, stz + 2, B.CHEST);
-    this.raw(stx + 2, g + 2, stz + 3, B.LAMP);
+    this.raw(stx + 2, g + 2, stz + 2, B.LAMP);
+    this.structureDetails.push({ type: 'outpost', x: stx, z: stz, g });
     this.sites.mags = { x: stx + 0.5, y: g, z: stz + 0.6 };
     this.sites.stall = { x: stx, y: g, z: stz };
     this.mags = this.sites.mags; this.stall = this.sites.stall;
@@ -489,6 +509,7 @@ export class World {
     }
     this.raw(dockX + Math.round(dx * 16), SEA + 1, dockZ + Math.round(dz * 16), B.CRATE);
     this.sites.villages.push({ island, name: o.name, x: cx + 0.5, y: g, z: cz + 0.5, tier });
+    this.structureDetails.push({ type: 'village', x: cx, z: cz, g, radius, spacing, major, island, dockX, dockZ, dx, dz });
     const endX = Math.floor(dockX + dx * 18), endZ = Math.floor(dockZ + dz * 18);
     this.reserved.push({ x0: Math.min(cx - radius - 2, endX - 2), x1: Math.max(cx + radius + 2, endX + 2), z0: Math.min(cz - radius - 2, endZ - 2), z1: Math.max(cz + radius + 2, endZ + 2) });
   }
@@ -508,7 +529,7 @@ export class World {
       this.supportGround(cx + dx, cz + dz, g);
       this.raw(cx + dx, g, cz + dz, edge ? B.BRICK : B.PLANK);
       for (let y = g + 1; y <= g + wallH; y++) {
-        if (!edge || (dz === hd && dx === 0 && y <= g + 2)) continue;
+        if (!edge || (dz === hd && Math.abs(dx) <= 1 && y <= g + 2)) continue;
         const window = y === g + 2 && ((Math.abs(dx) === hw && Math.abs(dz) === 1) || (Math.abs(dz) === hd && Math.abs(dx) === 2 && Math.abs(dx) < hw));
         if (!window) this.raw(cx + dx, y, cz + dz, wall);
       }
@@ -524,8 +545,8 @@ export class World {
       this.raw(cx + dx, g + 1, cz + dz, B.WRECKWOOD);
       this.raw(cx + dx, g + 3, cz + dz, B.WRECKWOOD);
     }
-    for (const dx of [-1, 1]) for (let y = g + 1; y <= g + wallH; y++) this.raw(cx + dx, y, cz + hd, B.WRECKWOOD);
-    for (let dx = -1; dx <= 1; dx++) this.raw(cx + dx, g + wallH, cz + hd, B.WRECKWOOD);
+    for (const dx of [-2, 2]) for (let y = g + 1; y <= g + wallH; y++) this.raw(cx + dx, y, cz + hd, B.WRECKWOOD);
+    for (let dx = -2; dx <= 2; dx++) this.raw(cx + dx, g + wallH, cz + hd, B.WRECKWOOD);
     for (const sx of [-1, 1]) for (let y = g + 1; y < g + wallH; y++) this.raw(cx + sx * hw, y, cz, B.WRECKWOOD);
     for (let y = g + 1; y < g + wallH; y++) this.raw(cx, y, cz - hd, B.WRECKWOOD);
     for (let dx = -hw; dx <= hw; dx++) for (let dz = -hd; dz <= hd; dz++) {
@@ -535,11 +556,11 @@ export class World {
     for (let dz = -rise; dz <= rise; dz++) {
       const y = g + wallH + rise - Math.abs(dz);
       for (let dx = -hw - 1; dx <= hw + 1; dx++) {
-        this.raw(cx + dx, y - 1, cz + dz, roof);
-        this.raw(cx + dx, y, cz + dz, roof);
+        this.rawRoof(cx + dx, y - 1, cz + dz, roof);
+        this.rawRoof(cx + dx, y, cz + dz, roof);
       }
     }
-    for (let dx = -hw; dx <= hw; dx++) this.raw(cx + dx, g + wallH + rise, cz, B.LOG);
+    for (let dx = -hw; dx <= hw; dx++) this.rawRoof(cx + dx, g + wallH + rise, cz, B.LOG);
     for (let dx = -1; dx <= 1; dx++) {
       this.supportGround(cx + dx, cz + hd + 1, g);
       this.raw(cx + dx, g, cz + hd + 1, B.PLANK);
@@ -552,7 +573,7 @@ export class World {
     if (role === 'inn' || role === 'market') {
       for (const dx of [-2, 2]) for (let y = g + 1; y <= g + 3; y++) this.raw(cx + dx, y, cz + hd + 2, B.LOG);
       for (let dx = -2; dx <= 2; dx++) this.raw(cx + dx, g + 3, cz + hd + 2, B.CLOTH);
-      this.raw(cx, g + 4, cz + hd + 2, B.LAMP);
+      this.raw(cx + 2, g + 2, cz + hd + 2, B.LAMP);
     }
     if (role === 'inn' || role === 'warehouse' || role === 'workshop') {
       this.raw(cx - hw - 1, g, cz + hd - 1, role === 'inn' ? B.BARREL : B.CRATE);
@@ -562,7 +583,10 @@ export class World {
       for (let y = g + wallH + rise + 1; y <= g + wallH + rise + 3; y++) this.raw(cx, y, cz - 1, B.WHITEBRICK);
       this.raw(cx, g + wallH + rise + 4, cz - 1, B.LAMP);
     }
-    this.raw(cx, g + 2, cz, B.LAMP);
+    this.raw(cx + hw, g + 2, cz + hd, B.LAMP);
+    const structure = { type: 'house', x: cx, z: cz, g, hw, hd, wallH, role };
+    this.structureDetails.push(structure);
+    this.sites.structures.push({ type: 'house', x: cx, z: cz, floor: g + 1, doorX: cx + 0.5, doorZ: cz + hd + 0.5, role });
   }
 
   buildLighthouse(i) {
@@ -584,7 +608,7 @@ export class World {
       if (inner && y < top - 1) { this.raw(lx + dx, y, lz + dz, B.AIR); continue; }
       this.raw(lx + dx, y, lz + dz, (y - g) % 5 === 4 ? B.BRICK : B.WHITEBRICK);
     }
-    for (let y = g; y < g + 2; y++) this.raw(lx + 2, y, lz, B.AIR);
+    for (const dz of [-1, 0, 1]) for (let y = g; y < g + 2; y++) this.raw(lx + 2, y, lz + dz, B.AIR);
     for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) if (!(Math.abs(dx) === 3 && Math.abs(dz) === 3)) this.raw(lx + dx, top, lz + dz, B.PLANK);
     for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let y = top + 1; y <= top + 2; y++) this.raw(lx + dx, y, lz + dz, B.LOG);
     this.raw(lx, top + 1, lz, B.LAMP);
@@ -603,6 +627,7 @@ export class World {
     this.raw(hx - 1, g + 2, hz + 1, B.LAMP);
     this.sites.lighthouse = { x: lx + 0.5, y: top + 1.5, z: lz + 0.5, base: g };
     this.sites.tallow = { x: lx + 4.5, y: g, z: lz + 1.5 };
+    this.structureDetails.push({ type: 'lighthouse', x: lx, z: lz, g, top, hx, hz });
     this.reserved.push({ x0: lx - 4, x1: hx + 6, z0: lz - 5, z1: lz + 5 });
   }
 
@@ -632,13 +657,15 @@ export class World {
       const h = 1 + ((rnd() * 2.6) | 0);
       for (let y = g; y < g + h; y++) put(x, y, z, rnd() < 0.6 ? B.MOSSBRICK : B.BRICK);
     }
-    for (const [tx, tz] of [[cx - 2, cz - 1], [cx + 2, cz + 1]]) {
+    const tents = [[cx - 2, cz - 1], [cx + 2, cz + 1]];
+    for (const [tx, tz] of tents) {
       for (let dz = -1; dz <= 1; dz++) { put(tx - 1, g, tz + dz, B.CLOTH); put(tx + 1, g, tz + dz, B.CLOTH); put(tx, g + 1, tz + dz, B.CLOTH); }
     }
     for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(cx + dx, g - 1, cz + dz + 2, B.STONE);
     put(cx, g - 1, cz + 2, B.LAMP);
     put(cx + 3, g, cz - 3, B.BONE); put(cx + 3, g + 1, cz - 3, B.BONE); put(cx + 3, g + 2, cz - 3, B.BONE);
     put(cx - 3, g, cz + 3, B.BONE);
+    this.structureDetails.push({ type: 'camp', x: cx, z: cz, g, tents });
     this.reserved.push({ x0: cx - 6, x1: cx + 6, z0: cz - 6, z1: cz + 6 });
     return { island: i, x: cx + 0.5, z: cz + 0.5, y: g, fire: { x: cx + 0.5, y: g, z: cz + 2.5 } };
   }
@@ -886,9 +913,11 @@ export class World {
     const A = { pos: [], nor: [], col: [], uv: [], lay: [], ind: [], n: 0 };
     const P = { pos: [], nor: [], col: [], uv: [], lay: [], sway: [], ind: [], n: 0 };
     const F = { pos: [], nor: [], col: [], uv: [], ind: [], n: 0 };
+    const ARCH = new GeoBuilder();
     for (let y = FLOOR; y < H; y++) for (let z = z0; z < z0 + CS; z++) for (let x = x0; x < x0 + CS; x++) {
-      const id = data[x + W * (z + D * y)];
+      const i = x + W * (z + D * y), id = data[i];
       if (id === 0 || TERRAIN[id] || LEAFY[id]) continue;
+      if (this.hiddenRoofCells.has(i)) continue;
       const def = BLOCKS[id];
       const h = hash3(x, y, z);
       if (def.plant) { this.emitPlant(P, x, y, z, def, h, id); continue; }
@@ -898,7 +927,8 @@ export class World {
       if (CRISP[id]) this.emitBlock(A, x, y, z, id, def, h);
       else if (PIECE[id]) emitPiece(this, A, x, y, z, id);
     }
-    for (const kind of ['t', 'l', 's', 'p', 'f']) {
+    this.emitStructureDetails(ARCH, key);
+    for (const kind of ['t', 'l', 's', 'p', 'f', 'a']) {
       const k = key + ':' + kind;
       const old = this.meshes.get(k);
       if (old) { this.group.remove(old); old.geometry.dispose(); this.meshes.delete(k); }
@@ -919,6 +949,338 @@ export class World {
     add(toGeometry(A), this.mats.solid, 's', true);
     add(toGeometry(P), this.mats.plant, 'p', false);
     add(toGeometry(F), this.mats.frond, 'f', true);
+    add(ARCH.empty ? null : ARCH.build(), this.mats.solid, 'a', true);
+  }
+  emitStructureDetails(A, key) {
+    if (!this.structureDetails.length) return;
+    const cx = key % NCX, cz = (key / NCX) | 0;
+    const inChunk = (x, z) => Math.floor(x / CS) === cx && Math.floor(z / CS) === cz;
+    const box = (x0, y0, z0, x1, y1, z1, layer, uv = 1, color = 0xffffff) => {
+      if (!inChunk((x0 + x1) * 0.5, (z0 + z1) * 0.5)) return;
+      const radius = Math.min(0.035, Math.min(x1 - x0, y1 - y0, z1 - z0) * 0.18);
+      if (radius > 0.004) A.rbox(x0, y0, z0, x1, y1, z1, color, layer, uv, radius);
+      else A.box(x0, y0, z0, x1, y1, z1, color, layer, uv);
+    };
+    const beam = (x0, y0, z0, x1, y1, z1, r, layer, color = 0xffffff) => {
+      if (inChunk((x0 + x1) * 0.5, (z0 + z1) * 0.5)) A.cyl(x0, y0, z0, x1, y1, z1, r, r * 0.82, color, layer, 8);
+    };
+    const face = (a, b, c, d, normal, layer, centerX, centerZ) => {
+      if (inChunk(centerX, centerZ)) A.quad(a, b, c, d, normal, 0xffffff, layer, [0, 0], [1, 0], [0, 1], [1, 1]);
+    };
+    const tri = (a, b, c, normal, layer, centerX, centerZ) => {
+      if (inChunk(centerX, centerZ)) A.face(a, b, c, normal, 0xffffff, layer);
+    };
+    for (const S of this.structureDetails) {
+      const reach = S.type === 'house' ? Math.max(S.hw, S.hd) + 4
+        : S.type === 'village' ? S.radius + 20
+          : S.type === 'lighthouse' ? 16
+            : S.type === 'camp' ? 8
+              : S.type === 'fort' ? 12
+                : S.type === 'cave' ? 12
+                  : S.type === 'ruin' ? 6
+                    : 10;
+      if (S.x + reach < cx * CS || S.x - reach > (cx + 1) * CS || S.z + reach < cz * CS || S.z - reach > (cz + 1) * CS) continue;
+      if (S.type === 'house') this.emitHouseDetails(A, S, inChunk, box, beam, face);
+      else if (S.type === 'village') this.emitVillageDetails(A, S, inChunk, box, beam, face);
+      else if (S.type === 'outpost') this.emitOutpostDetails(A, S, box, beam, face);
+      else if (S.type === 'lighthouse') this.emitLighthouseDetails(A, S, inChunk, box, beam);
+      else if (S.type === 'fort') this.emitFortDetails(A, S, inChunk, box, beam);
+      else if (S.type === 'camp') this.emitCampDetails(A, S, inChunk, box, beam, face, tri);
+      else if (S.type === 'ruin') this.emitRuinDetails(A, S, inChunk, box, beam);
+      else if (S.type === 'cave') this.emitCaveDetails(A, S, inChunk, box, beam);
+      else if (S.type === 'wreck') this.emitWreckDetails(A, S, inChunk, beam);
+    }
+  }
+  emitHouseDetails(A, S, inChunk, box, beam, face) {
+    const { x, z, g, hw, hd, wallH, role } = S;
+    const front = z + hd + 1.035, back = z - hd - 0.035;
+    const white = role === 'chapel' || role === 'warehouse';
+    const wallTile = white ? T.whitebrick : T.plank;
+    const wood = role === 'market' ? 0x7d3827 : 0xffffff;
+    const trim = T.log_side, roof = role === 'chapel' ? T.slate : T.wreckwood;
+    const base = T.stone;
+
+    for (const sx of [-1, 1]) {
+      const px = x + sx * hw;
+      box(px - 0.12, g + 1, front, px + 0.12, g + wallH + 0.12, front + 0.13, trim, 1.5, wood);
+      box(px - 0.12, g + 1, back - 0.13, px + 0.12, g + wallH + 0.12, back, trim, 1.5, wood);
+      const sideX = x + sx * (hw + 1.035);
+      box(sideX - 0.13, g + 1, z - hd, sideX, g + wallH + 0.12, z - hd + 0.12, trim, 1.5, wood);
+      box(sideX - 0.13, g + 1, z + hd - 0.12, sideX, g + wallH + 0.12, z + hd, trim, 1.5, wood);
+      box(sideX - 0.14, g + 1.08, z - hd, sideX + 0.03, g + 1.24, z + hd + 1, base, 1.6);
+      box(sideX - 0.14, g + wallH - 0.18, z - hd, sideX + 0.03, g + wallH - 0.02, z + hd + 1, trim, 1.6, wood);
+    }
+    box(x - hw, g + 1.08, front, x + hw + 1, g + 1.24, front + 0.15, base, 1.6);
+    box(x - hw, g + 1.08, back - 0.15, x + hw + 1, g + 1.24, back, base, 1.6);
+    box(x - hw, g + wallH - 0.18, front, x + hw + 1, g + wallH - 0.02, front + 0.15, trim, 1.6, wood);
+    box(x - hw, g + wallH - 0.18, back - 0.15, x + hw + 1, g + wallH - 0.02, back, trim, 1.6, wood);
+
+    const doorLeft = x - 1, doorRight = x + 2;
+    box(doorLeft - 0.14, g + 1, front, doorLeft + 0.02, g + 3.02, front + 0.16, trim, 2, wood);
+    box(doorRight - 0.02, g + 1, front, doorRight + 0.14, g + 3.02, front + 0.16, trim, 2, wood);
+    box(doorLeft - 0.2, g + 2.86, front, doorRight + 0.2, g + 3.08, front + 0.17, trim, 2, wood);
+    box(doorLeft - 0.12, g + 0.99, front, doorRight + 0.12, g + 1.07, front + 0.38, base, 2);
+    box(x - 0.72, g + 3.22, front + 0.01, x + 0.72, g + 3.72, front + 0.15, trim, 2, wood);
+    box(x - 0.52, g + 3.34, front + 0.17, x + 0.52, g + 3.57, front + 0.2, white ? T.whitebrick : T.brick, 1.2);
+
+    const windows = [
+      ...[-1, 1].flatMap((dz) => [[-hw, dz], [hw, dz]]),
+      ...[-2, 2].filter((dx) => Math.abs(dx) < hw).flatMap((dx) => [[dx, -hd], [dx, hd]]),
+    ];
+    for (const [dx, dz] of windows) {
+      const wx = x + dx, wz = z + dz;
+      const onSide = Math.abs(dx) === hw;
+      const sign = onSide ? Math.sign(dx) : Math.sign(dz);
+      const pane = onSide ? wx + sign * 0.53 : wz + sign * 0.53;
+      if (onSide) {
+        box(pane - sign * 0.06, g + 1.78, wz - 0.58, pane + sign * 0.06, g + 2.04, wz + 0.58, trim, 2, wood);
+        box(pane - sign * 0.06, g + 2.92, wz - 0.58, pane + sign * 0.06, g + 3.12, wz + 0.58, trim, 2, wood);
+        for (const side of [-1, 1]) box(pane - sign * 0.07, g + 2.02, wz + side * 0.44, pane + sign * 0.07, g + 2.91, wz + side * 0.56, trim, 1, wood);
+        box(pane - sign * 0.08, g + 2.4, wz - 0.48, pane + sign * 0.08, g + 2.48, wz + 0.48, trim, 1, wood);
+        for (const side of [-1, 1]) {
+          box(pane + sign * 0.07, g + 2.1, wz + side * 0.68, pane + sign * 0.25, g + 2.88, wz + side * 0.9, wallTile, 1.2, wood);
+          for (let slat = 0; slat < 3; slat++) box(pane + sign * 0.08, g + 2.2 + slat * 0.2, wz + side * 0.7, pane + sign * 0.27, g + 2.24 + slat * 0.2, wz + side * 0.92, trim, 1, wood);
+        }
+      } else {
+        box(wx - 0.58, g + 1.78, pane - sign * 0.06, wx + 0.58, g + 2.04, pane + sign * 0.06, trim, 2, wood);
+        box(wx - 0.58, g + 2.92, pane - sign * 0.06, wx + 0.58, g + 3.12, pane + sign * 0.06, trim, 2, wood);
+        for (const side of [-1, 1]) box(wx + side * 0.44, g + 2.02, pane - sign * 0.07, wx + side * 0.56, g + 2.91, pane + sign * 0.07, trim, 1, wood);
+        box(wx - 0.48, g + 2.4, pane - sign * 0.08, wx + 0.48, g + 2.48, pane + sign * 0.08, trim, 1, wood);
+      }
+    }
+
+    const rise = hd + 1;
+    for (const side of [-1, 1]) for (let step = 0; step <= hd; step++) {
+      const dz0 = hd + 1.18 - step, dz1 = dz0 - 1;
+      const y0 = g + wallH + step + 0.08, y1 = y0 + 1;
+      for (let dx = -hw - 1; dx <= hw + 1; dx++) {
+        const px = x + dx, supportZ = z + side * (hd + 1 - step), supportY = g + wallH + step;
+        if (this.get(px, supportY, supportZ) !== (role === 'chapel' ? B.SLATE : B.WRECKWOOD)) continue;
+        const x0 = px - 0.08, x1 = px + 1.08;
+        face([x0, y0, z + side * dz0], [x1, y0, z + side * dz0], [x0, y1, z + side * dz1], [x1, y1, z + side * dz1],
+          [0, 0.707, side * 0.707], roof, (x0 + x1) * 0.5, z + side * (dz0 + dz1) * 0.5);
+      }
+    }
+    const ridgeY = g + wallH + rise + 0.14;
+    beam(x - hw - 1, ridgeY, z, x + hw + 2, ridgeY, z, 0.11, trim, wood);
+    for (const side of [-1, 1]) {
+      const eaveY = g + wallH + 0.12, eaveZ = z + side * (hd + 1.18);
+      beam(x - hw - 1, eaveY, eaveZ, x + hw + 2, eaveY, eaveZ, 0.09, trim, wood);
+      for (let dx = -hw - 1; dx <= hw + 1; dx += 2) {
+        beam(x + dx + 0.5, eaveY, eaveZ, x + dx + 0.5, ridgeY, z, 0.055, trim, wood);
+      }
+    }
+    for (const end of [-1, 1]) {
+      const supportX = end < 0 ? x - hw : x + hw, px = supportX + (end < 0 ? -0.02 : 1.02);
+      if (!inChunk(px, z) || this.get(supportX, g + wallH, z) === B.AIR) continue;
+      A.face([px, g + wallH, z - hd - 1], [px, g + wallH + rise, z], [px, g + wallH, z + hd + 1], [end, 0, 0], 0xffffff, wallTile);
+    }
+    for (const side of [-1, 1]) {
+      const chimneyX = x + hw - 1, chimneyZ = z - hd;
+      if (role !== 'chapel' && role !== 'warehouse' && this.get(chimneyX, g + wallH + 3, chimneyZ) === B.BRICK) {
+        box(chimneyX - 0.16, g + wallH + 4, chimneyZ - 0.16, chimneyX + 1.16, g + wallH + 4.18, chimneyZ + 1.16, T.brick, 1.2);
+        break;
+      }
+    }
+    if (role === 'chapel') {
+      box(x - 0.12, ridgeY + 0.08, front + 0.05, x + 0.12, ridgeY + 1.05, front + 0.17, T.whitebrick, 1.2);
+      box(x - 0.48, ridgeY + 0.55, front + 0.05, x + 0.48, ridgeY + 0.74, front + 0.17, T.whitebrick, 1.2);
+    }
+    const rug = role === 'chapel' ? T.white : T.cloth;
+    box(x - 1.1, g + 1.015, z - 1.25, x + 1.1, g + 1.055, z + 0.25, rug, 1.1, role === 'chapel' ? 0x8c4336 : 0xffffff);
+    for (const side of [-1, 1]) {
+      const px = x + side * 1.45, pz = z + hd + 1.35;
+      beam(px, g + 1, pz, px, g + 2.35, pz, 0.075, trim, wood);
+      beam(px, g + 2.25, pz, px - side * 0.4, g + 2.45, pz - 0.25, 0.045, trim, wood);
+    }
+  }
+  emitVillageDetails(A, S, inChunk, box, beam, face) {
+    const { x, z, g, major, spacing, radius, island, dockX, dockZ, dx, dz } = S;
+    const lampLanes = major ? [-2, -1, 0, 1, 2] : [-1, 0, 1];
+    for (const k of lampLanes) for (const [px, pz] of [
+      [x + k * spacing, z - radius + 3], [x + k * spacing, z + radius - 3],
+      [x - radius + 3, z + k * spacing], [x + radius - 3, z + k * spacing],
+    ]) {
+      const lx = px + 0.5, lz = pz + 0.5;
+      box(px + 0.24, g + 1.05, pz + 0.24, px + 0.76, g + 1.18, pz + 0.76, T.stone, 1.2);
+      beam(lx, g + 2.35, lz, lx + 0.55, g + 2.7, lz, 0.065, T.log_side);
+      box(px + 0.23, g + 2.58, pz + 0.23, px + 0.77, g + 3.12, pz + 0.77, T.lamp, 1.4, 0xffd791);
+      for (const side of [-1, 1]) {
+        box(lx + side * 0.3 - 0.035, g + 2.52, lz - 0.035, lx + side * 0.3 + 0.035, g + 3.18, lz + 0.035, T.log_side, 2);
+        box(lx - 0.3, g + 2.52, lz + side * 0.3 - 0.035, lx + 0.3, g + 2.59, lz + side * 0.3 + 0.035, T.log_side, 2);
+      }
+      beam(lx, g + 3.12, lz, lx, g + 3.38, lz, 0.045, T.log_side);
+    }
+
+    const stallOffset = Math.max(3, Math.floor(spacing / 3));
+    const stalls = [[-stallOffset, -stallOffset], [stallOffset, -stallOffset], [-stallOffset, stallOffset], [stallOffset, stallOffset]];
+    for (let stall = 0; stall < 2; stall++) {
+      const [ox, oz] = stalls[(island + stall) % stalls.length], alongX = ox * oz > 0;
+      const sx = x + ox, sz = z + oz;
+      if (alongX) {
+        box(sx - 1.08, g + 1.08, sz + 0.18, sx + 2.08, g + 1.26, sz + 0.82, T.plank, 1.8);
+        for (const px of [sx - 0.82, sx + 1.82]) beam(px, g + 0.12, sz + 0.5, px, g + 1.12, sz + 0.5, 0.065, T.log_side);
+        face([sx - 1, g + 4.12, sz - 0.28], [sx + 2, g + 4.12, sz - 0.28], [sx - 1, g + 4.65, sz + 0.5], [sx + 2, g + 4.65, sz + 0.5], [0, 0.83, -0.55], T.cloth, sx + 0.5, sz + 0.1);
+        face([sx - 1, g + 4.65, sz + 0.5], [sx + 2, g + 4.65, sz + 0.5], [sx - 1, g + 4.12, sz + 1.28], [sx + 2, g + 4.12, sz + 1.28], [0, 0.83, 0.55], T.cloth, sx + 0.5, sz + 0.9);
+        box(sx - 0.35, g + 2.25, sz - 0.02, sx + 1.35, g + 2.72, sz + 0.12, T.wreckwood, 1.3);
+      } else {
+        box(sx + 0.18, g + 1.08, sz - 1.08, sx + 0.82, g + 1.26, sz + 2.08, T.plank, 1.8);
+        for (const pz of [sz - 0.82, sz + 1.82]) beam(sx + 0.5, g + 0.12, pz, sx + 0.5, g + 1.12, pz, 0.065, T.log_side);
+        face([sx - 0.28, g + 4.12, sz - 1], [sx + 0.5, g + 4.65, sz - 1], [sx - 0.28, g + 4.12, sz + 2], [sx + 0.5, g + 4.65, sz + 2], [-0.55, 0.83, 0], T.cloth, sx + 0.1, sz + 0.5);
+        face([sx + 0.5, g + 4.65, sz - 1], [sx + 1.28, g + 4.12, sz - 1], [sx + 0.5, g + 4.65, sz + 2], [sx + 1.28, g + 4.12, sz + 2], [0.55, 0.83, 0], T.cloth, sx + 0.9, sz + 0.5);
+        box(sx + 0.38, g + 2.25, sz - 0.35, sx + 0.52, g + 2.72, sz + 1.35, T.wreckwood, 1.3);
+      }
+    }
+
+    for (let k = 0; k < 18; k += 4) for (const side of [-1, 1]) {
+      const px = dockX + dx * k - dz * side, pz = dockZ + dz * k + dx * side;
+      if (this.get(px, SEA + 1, pz) !== B.PLANK) continue;
+      beam(px + 0.5, SEA + 1, pz + 0.5, px + 0.5, SEA + 2.15, pz + 0.5, 0.13, T.log_side);
+      box(px + 0.22, SEA + 1.75, pz + 0.22, px + 0.78, SEA + 1.84, pz + 0.78, T.wreckwood, 1.8);
+    }
+    const endX = dockX + dx * 17, endZ = dockZ + dz * 17;
+    beam(endX + 0.5, SEA + 1, endZ + 0.5, endX + 0.5, SEA + 2.25, endZ + 0.5, 0.2, T.log_side);
+  }
+  emitOutpostDetails(A, S, box, beam, face) {
+    const { x, z, g } = S;
+    const roofX0 = x - 3, roofX1 = x + 4, roofZ0 = z - 3, roofZ1 = z + 4;
+    const ridgeX = x + 0.5, ridgeY = g + 4.6, eaveY = g + 3.78;
+    face([roofX0, eaveY, roofZ0], [ridgeX, ridgeY, roofZ0], [roofX0, eaveY, roofZ1], [ridgeX, ridgeY, roofZ1],
+      [-0.24, 0.97, 0], T.cloth, (roofX0 + ridgeX) * 0.5, z + 0.5);
+    face([ridgeX, ridgeY, roofZ0], [roofX1, eaveY, roofZ0], [ridgeX, ridgeY, roofZ1], [roofX1, eaveY, roofZ1],
+      [0.24, 0.97, 0], T.cloth, (ridgeX + roofX1) * 0.5, z + 0.5);
+    beam(roofX0, eaveY, roofZ0, roofX0, eaveY, roofZ1, 0.11, T.log_side);
+    beam(roofX1, eaveY, roofZ0, roofX1, eaveY, roofZ1, 0.11, T.log_side);
+    beam(ridgeX, ridgeY, roofZ0, ridgeX, ridgeY, roofZ1, 0.12, T.log_side);
+    for (let pz = roofZ0 + 1; pz < roofZ1; pz += 2) {
+      beam(roofX0, eaveY, pz, ridgeX, ridgeY, pz, 0.055, T.wreckwood);
+      beam(ridgeX, ridgeY, pz, roofX1, eaveY, pz, 0.055, T.wreckwood);
+    }
+    for (const side of [-1, 1]) {
+      const px = x + side * 2, pz = z + side * 2;
+      box(px - 0.56, g + 0.08, pz - 0.56, px + 0.56, g + 0.2, pz + 0.56, T.stone, 1.4);
+      box(px - 0.18, g + 1.05, pz - 0.18, px + 0.18, g + 1.12, pz + 0.18, T.wreckwood, 1.4);
+      beam(px + 0.5, g + 2.75, pz + 0.5, px + 0.5, eaveY, pz + 0.5, 0.075, T.log_side);
+    }
+    for (let k = -1; k <= 1; k++) {
+      const px = x + k * 1.4;
+      box(px - 0.48, g + 1.12, z + 0.68, px + 0.48, g + 1.23, z + 0.92, T.wreckwood, 1.5);
+      box(px - 0.42, g + 1.25, z + 0.7, px + 0.42, g + 1.31, z + 0.9, T.plank, 1.1);
+    }
+    const signX = x - 2.45, signZ = z + 0.5;
+    beam(signX, g + 1, signZ, signX, g + 2.8, signZ, 0.07, T.log_side);
+    box(signX - 0.48, g + 2, signZ - 0.08, signX + 0.48, g + 2.68, signZ + 0.08, T.wreckwood, 1.4);
+    box(signX - 0.34, g + 2.13, signZ + 0.09, signX + 0.34, g + 2.22, signZ + 0.12, T.cloth, 1.2, 0xd4b26e);
+  }
+  emitLighthouseDetails(A, S, inChunk, box, beam) {
+    const { x, z, g, top, hx, hz } = S;
+    for (let y = g + 2; y < top; y += 4) {
+      box(x - 2.08, y, z - 2, x - 1.9, y + 0.18, z + 3, T.brick, 1.5);
+      box(x + 2.9, y, z - 2, x + 3.08, y + 0.18, z + 3, T.brick, 1.5);
+      box(x - 2, y, z - 2.08, x + 3, y + 0.18, z - 1.9, T.brick, 1.5);
+      box(x - 2, y, z + 2.9, x + 3, y + 0.18, z + 3.08, T.brick, 1.5);
+    }
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      beam(x + 0.5 + sx * 2.05, g + 1, z + 0.5 + sz * 2.05, x + 0.5 + sx * 2.05, top + 0.55, z + 0.5 + sz * 2.05, 0.08, T.log_side);
+    }
+    for (const y of [g + 4, g + 8]) {
+      for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const px = x + 0.5 + sx * 2.52, pz = z + 0.5 + sz * 2.52;
+        if (sx) {
+          box(px - sx * 0.1, y, pz - 0.48, px + sx * 0.1, y + 1.2, pz + 0.48, T.vault_side, 1.2, 0x9bb7b5);
+          box(px - sx * 0.17, y - 0.12, pz - 0.56, px + sx * 0.17, y + 0.05, pz + 0.56, T.log_side, 1.5);
+          box(px - sx * 0.17, y + 1.16, pz - 0.56, px + sx * 0.17, y + 1.32, pz + 0.56, T.log_side, 1.5);
+        } else {
+          box(px - 0.48, y, pz - sz * 0.1, px + 0.48, y + 1.2, pz + sz * 0.1, T.vault_side, 1.2, 0x9bb7b5);
+          box(px - 0.56, y - 0.12, pz - sz * 0.17, px + 0.56, y + 0.05, pz + sz * 0.17, T.log_side, 1.5);
+          box(px - 0.56, y + 1.16, pz - sz * 0.17, px + 0.56, y + 1.32, pz + sz * 0.17, T.log_side, 1.5);
+        }
+      }
+    }
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+      if (Math.abs(dx) !== 3 && Math.abs(dz) !== 3) continue;
+      beam(x + dx + 0.5, top + 0.15, z + dz + 0.5, x + dx + 0.5, top + 1.05, z + dz + 0.5, 0.055, T.log_side);
+    }
+    box(x - 2.2, top + 1, z - 2.2, x + 3.2, top + 1.16, z + 3.2, T.log_side, 1.2);
+    box(x + 0.05, top + 2.8, z + 0.05, x + 0.95, top + 3.05, z + 0.95, T.lamp, 1.2, 0xffd97a);
+
+    const front = hz + 4.03;
+    for (const sx of [hx + 0.15, hx + 2.85]) beam(sx, g + 1, front, sx, g + 3, front, 0.07, T.log_side);
+    box(hx - 0.15, g + 2.82, front, hx + 3.15, g + 3.04, front + 0.14, T.log_side, 1.5);
+    box(hx + 0.1, g + 1.08, hz + 0.1, hx + 3.9, g + 1.24, hz + 3.9, T.stone, 1.4);
+    for (const side of [0, 3]) for (let dz = 1; dz <= 2; dz++) {
+      box(hx + side - 0.05, g + 1.8, hz + dz - 0.05, hx + side + 0.15, g + 2.55, hz + dz + 0.15, T.log_side, 1.2);
+    }
+  }
+  emitFortDetails(A, S, inChunk, box, beam) {
+    const { x, z, g } = S;
+    for (let k = -6; k <= 6; k++) for (const [px, pz] of [[x + k, z - 6], [x + k, z + 6], [x - 6, z + k], [x + 6, z + k]]) {
+      if (this.get(px, g + 1, pz) === B.AIR) continue;
+      box(px + 0.08, g + 3.05, pz + 0.08, px + 0.92, g + 3.22, pz + 0.92, T.slate, 1.2);
+      if (k % 2 === 0) box(px + 0.2, g + 3.22, pz + 0.2, px + 0.8, g + 3.85, pz + 0.8, T.mossbrick, 1.1);
+    }
+    for (const sx of [-1, 1]) {
+      const px = x + sx * 1.65;
+      beam(px, g + 0.2, z + 2.5, px, g + 3.1, z + 2.5, 0.11, T.log_side);
+    }
+    box(x - 1.85, g + 2.85, z + 2.88, x + 2.15, g + 3.08, z + 3.08, T.log_side, 1.5);
+    box(x - 1.9, g + 1.08, z - 1.9, x + 2.9, g + 1.22, z + 2.9, T.plank, 1.4);
+    for (const [sx, sz] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) {
+      beam(x + sx + 0.5, g + 0.3, z + sz + 0.5, x + sx + 0.5, g + 5.2, z + sz + 0.5, 0.12, T.mossbrick);
+    }
+  }
+  emitCampDetails(A, S, inChunk, box, beam, face, tri) {
+    const { x, z, g, tents } = S;
+    for (const [tx, tz] of tents) {
+      const cx = tx + 0.5, cz = tz + 0.5;
+      beam(cx, g + 0.15, cz, cx, g + 2.5, cz, 0.075, T.log_side);
+      face([tx - 0.08, g + 0.04, tz - 1], [tx - 0.08, g + 0.04, tz + 2], [cx, g + 2.42, tz - 1], [cx, g + 2.42, tz + 2], [-0.92, 0.39, 0], T.cloth, cx - 0.25, cz);
+      face([cx, g + 2.42, tz - 1], [cx, g + 2.42, tz + 2], [tx + 1.08, g + 0.04, tz - 1], [tx + 1.08, g + 0.04, tz + 2], [0.92, 0.39, 0], T.cloth, cx + 0.25, cz);
+      tri([tx - 0.08, g + 0.04, tz - 1], [cx, g + 2.42, tz - 1], [tx + 1.08, g + 0.04, tz - 1], [0, 0, -1], T.cloth, cx, tz - 1);
+      tri([tx + 1.08, g + 0.04, tz + 2], [cx, g + 2.42, tz + 2], [tx - 0.08, g + 0.04, tz + 2], [0, 0, 1], T.cloth, cx, tz + 2);
+      for (const side of [-1, 1]) {
+        beam(tx + 0.5 + side, g + 0.08, tz + 0.5, tx + 0.5 + side * 1.25, g + 1.72, tz + 0.5, 0.035, T.log_side);
+      }
+      box(tx + 0.1, g + 0.12, tz + 0.15, tx + 0.9, g + 0.2, tz + 0.85, T.cloth, 1.2, 0x794b44);
+    }
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2, px = x + 0.5 + Math.cos(a) * 1.15, pz = z + 2.5 + Math.sin(a) * 1.15;
+      box(px - 0.18, g + 0.02, pz - 0.18, px + 0.18, g + 0.2, pz + 0.18, T.stone, 1.1);
+    }
+    beam(x + 3.5, g + 2.8, z - 2.5, x + 3.5, g + 3.8, z - 2.5, 0.055, T.bone);
+  }
+  emitCaveDetails(A, S, inChunk, box, beam) {
+    const { x, z, y, angle } = S, dx = Math.cos(angle), dz = Math.sin(angle), px = -dz, pz = dx;
+    const ground = y + 0.05;
+    for (const side of [-1, 1]) {
+      const cx = x + px * side, cz = z + pz * side;
+      beam(cx, ground, cz, cx, ground + 2.7, cz, 0.12, T.log_side);
+      beam(cx, ground + 2.7, cz, cx + dx, ground + 2.95, cz + dz, 0.12, T.log_side);
+    }
+    beam(x - px, ground + 2.72, z - pz, x + px, ground + 2.72, z + pz, 0.12, T.log_side);
+    box(x + dx * 3 - 0.45, ground + 0.02, z + dz * 3 - 0.45, x + dx * 3 + 0.45, ground + 0.08, z + dz * 3 + 0.45, T.plank, 1.1);
+  }
+  emitRuinDetails(A, S, inChunk, box, beam) {
+    const { x, z, g } = S;
+    for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3], [0, -3], [0, 3]]) {
+      if (this.get(x + dx, g, z + dz) === B.AIR) continue;
+      beam(x + dx + 0.5, g + 0.1, z + dz + 0.5, x + dx + 0.5, g + 3.3, z + dz + 0.5, 0.16, T.mossbrick);
+      box(x + dx + 0.18, g + 2.95, z + dz + 0.18, x + dx + 0.82, g + 3.18, z + dz + 0.82, T.brick, 1.1);
+    }
+    for (const side of [-1, 1]) {
+      const px = x + side * 3.5;
+      if (this.get(Math.floor(px), g + 2, z) !== B.AIR) beam(px, g + 2.5, z - 2.7, px, g + 2.5, z + 2.7, 0.12, T.mossbrick);
+    }
+    box(x - 0.45, g + 0.02, z - 0.45, x + 0.45, g + 0.08, z + 0.45, T.cloth, 1, 0x7d643f);
+  }
+  emitWreckDetails(A, S, inChunk, beam) {
+    const { x, z, h, floor } = S, c = Math.cos(h), s = Math.sin(h);
+    const at = (u, v) => [x + u * c - v * s, z + u * s + v * c];
+    for (let u = -5; u <= 4; u += 2) for (const side of [-1, 1]) {
+      const [x0, z0] = at(u, side * 2.6), [x1, z1] = at(u + 0.2, side * 0.8);
+      if (this.get(Math.round(x0), floor + 1, Math.round(z0)) === B.AIR) continue;
+      beam(x0 + 0.5, floor + 1.05, z0 + 0.5, x1 + 0.5, floor + 2.1, z1 + 0.5, 0.1, T.wreckwood);
+    }
   }
   // Geometry for a smooth surface: every vertex takes its colours from the blocks around it.
   surfaceGeometry(S, tris, leafy) {
@@ -1841,6 +2203,7 @@ export class World {
     for (const [u, v] of [[-3, 1], [-3, -1], [2, 1], [4, -1], [-5, 1]]) { const [bx, bz] = at(u, v); if (rnd() < 0.8) { const by = floor + 1 + (u > 1 ? Math.floor((u - 1) * 0.9) : 0); let id = rnd() < 0.5 ? B.BARREL : B.CRATE; if (id === B.BARREL && hash3(bx, by, bz) < 0.4) id = B.KEG; this.rawIfAir(bx, by, bz, id); } }
     this.sites.wrecks.push({ x: cx, y: floor + 1, z: cz, island: this.islands.indexOf(o), h });
     this.sites.loot.push({ x: cx, y: floor + 1, z: cz, kind: 'wreck' });
+    this.structureDetails.push({ type: 'wreck', x, z, h, floor });
   }
   // 0.5: six more islands in the open water between the old ones. They use their own dice, so every
   // island, wreck and reef from before stays exactly where it was.
@@ -1992,7 +2355,7 @@ export class World {
     // the keep: four walls, a doorway, the chest inside, powder kegs by the walls
     for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
       if (Math.abs(dx) < 2 && Math.abs(dz) < 2) continue;
-      if (dz === 2 && dx === 0) continue;
+      if (dz === 2 && Math.abs(dx) <= 1) continue;
       for (let y = g; y < g + 3; y++) this.raw(cx + dx, y, cz + dz, brick());
     }
     for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (rnd() < 0.7) this.raw(cx + dx, g + 3, cz + dz, B.PLANK);
@@ -2001,6 +2364,7 @@ export class World {
     for (const [kx, kz] of [[-5, -3], [5, 2], [-4, 5], [3, -5]]) this.raw(cx + kx, g, cz + kz, B.KEG);
     this.raw(cx - 3, g, cz + 3, B.LAMP);
     this.sites.loot.push({ x: cx, y: g, z: cz - 1, kind: 'fort' });
+    this.structureDetails.push({ type: 'fort', x: cx, z: cz, g });
     this.reserved.push({ x0: cx - 10, x1: cx + 10, z0: cz - 10, z1: cz + 10 });
     return { island: i, x: cx + 0.5, z: cz + 3.5, y: g, fire: { x: cx - 2.5, y: g, z: cz + 3.5 } };
   }
@@ -2029,6 +2393,7 @@ export class World {
       // a little jetty out into the lagoon
       for (let k = 1; k <= 4; k++) for (const w of [0, 1]) { const px = Math.floor(x - ux * k - uz * w), pz = Math.floor(z - uz * k + ux * w); if (!this.solid(px, SEA, pz)) this.raw(px, SEA, pz, B.PLANK); }
       this.sites.loot.push({ x: cxp, y: y0, z: czp, kind: 'cove' });
+      this.structureDetails.push({ type: 'cave', x, z, y: y0, angle: a });
       this.reserved.push({ x0: cxp - 4, x1: cxp + 4, z0: czp - 4, z1: czp + 4 });
       return;
     }
@@ -2057,6 +2422,7 @@ export class World {
       for (let k = -3; k <= 3; k++) if (rnd() < 0.55) this.raw(x + k, g + 4, z - 3, B.MOSSBRICK);
       this.raw(x, g, z, B.CHEST);
       this.raw(x - 1, g, z, B.MOSSBRICK); this.raw(x + 1, g, z, B.MOSSBRICK);
+      this.structureDetails.push({ type: 'ruin', x, z, g });
       this.sites.loot.push({ x, y: g, z, kind: 'ruin' });
       return;
     }
