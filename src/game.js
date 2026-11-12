@@ -1179,7 +1179,7 @@ export class Game {
   }
   updateViewModel(dt) {
     const P = this.player;
-    this.vmSwing = Math.max(0, this.vmSwing - dt * 4.2);
+    this.vmSwing = Math.max(0, this.vmSwing - dt * 3.2);
     if (!this.showViewArm()) return;
     const item = this.hotbar[this.sel];
     const have = !!item && (ITEMS[item].tool || (this.inv[item] || 0) > 0);

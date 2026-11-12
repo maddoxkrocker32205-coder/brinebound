@@ -298,6 +298,42 @@ function beardShape(color) {
   return part(geometry, color, [0, 0, -0.125], [1, 1, 1], [0, Math.PI, 0], 'hair');
 }
 
+function hatBrimGeometry(style) {
+  const segments = 48, positions = [], indices = [];
+  const bicorne = style === 'Bicorne';
+  const rx = bicorne ? 0.16 : 0.145, rz = bicorne ? 0.105 : 0.12;
+  const peaks = bicorne ? [0, Math.PI] : [Math.PI / 2, Math.PI * 7 / 6, Math.PI * 11 / 6];
+  const edge = [];
+  for (let i = 0; i < segments; i++) {
+    const a = i / segments * Math.PI * 2;
+    const lift = Math.max(...peaks.map((peak) => Math.pow(Math.max(0, Math.cos(a - peak)), 3)));
+    const flare = 1 + lift * 0.08;
+    const y = 0.12 + lift * 0.065;
+    edge.push([Math.cos(a) * rx * flare, y, Math.sin(a) * rz * flare]);
+  }
+  for (let layer = 0; layer < 4; layer++) {
+    for (let i = 0; i < segments; i++) {
+      const a = i / segments * Math.PI * 2;
+      const [x, y, z] = edge[i];
+      if (layer === 0) positions.push(Math.cos(a) * 0.08, 0.12, Math.sin(a) * 0.07);
+      else if (layer === 1) positions.push(x, y, z);
+      else if (layer === 2) positions.push(Math.cos(a) * 0.08, 0.105, Math.sin(a) * 0.07);
+      else positions.push(x, y - 0.012, z);
+    }
+  }
+  for (let i = 0; i < segments; i++) {
+    const j = (i + 1) % segments;
+    const ti = i, to = segments + i, tj = j, toj = segments + j;
+    const bi = segments * 2 + i, bo = segments * 3 + i, bj = segments * 2 + j, boj = segments * 3 + j;
+    indices.push(ti, tj, to, to, tj, toj, bi, bo, bj, bo, boj, bj, to, toj, bo, toj, boj, bo);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function headParts(L) {
   const p = [
     profile(L.skin, [[-0.045, 0.055, 0.065], [-0.015, 0.095, 0.105], [0.045, 0.13, 0.125], [0.12, 0.15, 0.14], [0.22, 0.15, 0.14], [0.30, 0.12, 0.12], [0.345, 0.065, 0.075]], 28, [0, 0, 0], [1, 1, 1], 'skin'),
@@ -344,9 +380,10 @@ function headParts(L) {
   }
   if (L.hat === 'Tricorn') {
     p.push(
-      profile(C.hatBlack, [[0.32, 0.205, 0.18], [0.35, 0.24, 0.2], [0.375, 0.19, 0.16]], 24),
-      profile(C.hatBlack, [[0.35, 0.145, 0.13], [0.39, 0.14, 0.125], [0.49, 0.115, 0.1], [0.52, 0.075, 0.07]], 24),
-      box(C.brass, [0, 0.396, -0.129], [0.075, 0.065, 0.025]),
+      part(hatBrimGeometry('Tricorn'), C.hatBlack, [0, 0.14, 0], [1, 1, 1]),
+      profile(C.hatBlack, [[0.26, 0.084, 0.073], [0.29, 0.084, 0.073], [0.36, 0.066, 0.06]], 32),
+      profile(C.brass, [[0.285, 0.085, 0.074], [0.302, 0.082, 0.072]], 32),
+      sphere(C.brass, [0, 0.31, 0.079], [0.012, 0.014, 0.008], [0, 0, 0], 'metal'),
     );
   } else if (L.hat === 'Bandana') {
     p.push(
@@ -356,9 +393,11 @@ function headParts(L) {
     );
   } else if (L.hat === 'Bicorne') {
     p.push(
-      profile(C.hatBlack, [[0.34, 0.25, 0.12], [0.37, 0.26, 0.13]], 24),
-      profile(C.hatBlack, [[0.36, 0.14, 0.1], [0.4, 0.13, 0.09], [0.48, 0.1, 0.075]], 24),
-      capsule(C.feather, [0.11, 0.53, -0.005], 0.018, 0.14, [1, 1, 0.5], [0, 0, -0.5]),
+      part(hatBrimGeometry('Bicorne'), C.hatBlack, [0, 0.14, 0], [1, 1, 1]),
+      profile(C.hatBlack, [[0.26, 0.084, 0.073], [0.29, 0.084, 0.073], [0.35, 0.068, 0.058]], 32),
+      profile(C.brass, [[0.285, 0.085, 0.074], [0.302, 0.082, 0.072]], 32),
+      capsule(C.feather, [0.066, 0.375, 0.02], 0.009, 0.055, [1, 1, 0.75], [0, 0, -0.55]),
+      sphere(C.brass, [0.065, 0.32, 0.065], [0.012, 0.014, 0.008], [0, 0, 0], 'metal'),
     );
   } else if (L.hat === 'Hood') {
     const hood = part(new THREE.SphereGeometry(1, 24, 18, 0, Math.PI * 2, 0, Math.PI / 2), C.hood, [0, 0.14, 0.045], [0.19, 0.25, 0.18]);
@@ -718,21 +757,17 @@ function humanHeadwear(L, head) {
     const hood = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.75), clothMaterial);
     hood.position.set(0, 0.035, -0.025); hood.scale.set(0.13, 0.16, 0.13); hood.castShadow = true; head.add(hood);
   } else if (L.hat === 'Tricorn' || L.hat === 'Bicorne') {
-    const brim = addMesh(head, new THREE.CylinderGeometry(0.16, 0.16, 0.025, 48), clothMaterial, [0, 0.11, 0], L.hat === 'Bicorne' ? [1.25, 1, 0.7] : [1, 1, 0.76]);
-    const crown = addMesh(head, new THREE.CylinderGeometry(0.105, 0.12, 0.085, 32), clothMaterial, [0, 0.16, 0], [1, 1, 0.82]);
-    if (L.hat === 'Tricorn') {
-      for (let i = 0; i < 3; i++) {
-        const a = i * Math.PI * 2 / 3 + Math.PI / 6;
-        const curve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(Math.cos(a) * 0.13, 0.11, Math.sin(a) * 0.1),
-          new THREE.Vector3(Math.cos(a) * 0.11, 0.18, Math.sin(a) * 0.085),
-          new THREE.Vector3(Math.cos(a) * 0.055, 0.2, Math.sin(a) * 0.05),
-        ]);
-        addMesh(head, new THREE.TubeGeometry(curve, 10, 0.012, 6, false), clothMaterial, [0, 0, 0]);
-      }
+    const brim = addMesh(head, hatBrimGeometry(L.hat), clothMaterial, [0, 0, 0]);
+    const crown = addMesh(head, new THREE.CylinderGeometry(0.068, 0.084, 0.086, 32, 1), clothMaterial, [0, 0.166, -0.004]);
+    const band = addMesh(head, new THREE.TorusGeometry(0.078, 0.0045, 8, 32), new THREE.MeshStandardMaterial({ color: C.brass, metalness: 0.45, roughness: 0.52 }), [0, 0.145, -0.004]);
+    band.rotation.x = Math.PI / 2;
+    const pinX = L.hat === 'Bicorne' ? 0.066 : 0;
+    addMesh(head, new THREE.SphereGeometry(0.011, 12, 8), new THREE.MeshStandardMaterial({ color: C.brass, metalness: 0.55, roughness: 0.42 }), [pinX, 0.158, 0.081]);
+    if (L.hat === 'Bicorne') {
+      const feather = addMesh(head, new THREE.CapsuleGeometry(0.008, 0.052, 4, 8), new THREE.MeshStandardMaterial({ color: C.feather, roughness: 0.9 }), [0.066, 0.232, 0.015]);
+      feather.rotation.z = -0.55;
     }
-    addMesh(head, new THREE.BoxGeometry(0.065, 0.046, 0.015), new THREE.MeshStandardMaterial({ color: C.brass, metalness: 0.55, roughness: 0.45 }), [0, 0.155, 0.095]);
-    brim.userData.sharedHumanModel = false; crown.userData.sharedHumanModel = false;
+    brim.userData.sharedHumanModel = false; crown.userData.sharedHumanModel = false; band.userData.sharedHumanModel = false;
   }
   return eyelids;
 }
@@ -757,6 +792,7 @@ export class Avatar {
     this.root.clear();
     this.humanRig = null;
     this.humanBones = null;
+    this.humanPoseBasis = null;
     this.humanFace = null;
     if (HUMAN_SOURCE) {
       this.buildHuman(L);
@@ -801,6 +837,12 @@ export class Avatar {
     this.humanRig.updateMatrixWorld(true);
     this.humanRest = {};
     for (const [name, bone] of Object.entries(this.humanBones)) this.humanRest[name] = bone.quaternion.clone();
+    this.root.updateMatrixWorld(true);
+    const actorWorldInverse = this.root.getWorldQuaternion(new THREE.Quaternion()).invert();
+    this.humanPoseBasis = {};
+    for (const [name, bone] of Object.entries(this.humanBones)) {
+      this.humanPoseBasis[name] = actorWorldInverse.clone().multiply(bone.parent.getWorldQuaternion(new THREE.Quaternion()));
+    }
     const gear = new THREE.Group();
     mesh(gear, humanGearParts(L, this.extra));
     this.humanRig.add(gear);
@@ -846,21 +888,24 @@ export class Avatar {
     }
   }
   poseHuman(state, dt, o, pose) {
-    const bones = this.humanBones, rest = this.humanRest, k = Math.min(1, dt * 12);
+    const bones = this.humanBones, rest = this.humanRest, basis = this.humanPoseBasis, k = Math.min(1, dt * 12);
+    const poseEuler = new THREE.Euler(), poseRotation = new THREE.Quaternion(), target = new THREE.Quaternion();
     const set = (name, x = 0, y = 0, z = 0) => {
       const bone = bones[name];
       if (!bone) return;
-      const target = rest[name].clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z)));
+      poseRotation.setFromEuler(poseEuler.set(x, y, z));
+      target.copy(basis[name]).invert().multiply(poseRotation).multiply(basis[name]).multiply(rest[name]);
       bone.quaternion.slerp(target, k);
     };
-    const { legL, legR, kneeL, kneeR, armL, armR, armLz, armRz, elbowL, elbowR, torsoX, torsoY, torsoZ, rootY, headX, headY } = pose;
+    const { legL, legR, kneeL, kneeR, footL, footR, armL, armR, armRy, armLz, armRz, elbowL, elbowR, pelvisX, torsoX, torsoY, torsoZ, rootY, headX, headY } = pose;
     this.humanRig.position.y = rootY;
     this.root.rotation.x = state === 'dead' ? -Math.PI / 2 + 0.1 : 0;
+    set('pelvis', pelvisX);
     set('thigh_l', legL); set('thigh_r', legR);
-    set('calf_l', state === 'swim' ? 0 : kneeL); set('calf_r', state === 'swim' ? 0 : kneeR);
-    set('foot_l', state === 'swim' ? -0.15 : 0); set('foot_r', state === 'swim' ? -0.15 : 0);
-    set('upperarm_l', armL, 0, -0.65 + armLz);
-    set('upperarm_r', armR, 0, 0.65 + armRz);
+    set('calf_l', kneeL); set('calf_r', kneeR);
+    set('foot_l', footL); set('foot_r', footR);
+    set('upperarm_l', armL, 0, 0.65 + armLz);
+    set('upperarm_r', armR, armRy, -0.65 + armRz);
     set('lowerarm_l', elbowL); set('lowerarm_r', elbowR);
     const breathing = state === 'idle' || state === 'helm' ? Math.sin(this.t * 1.6) * 0.012 : 0;
     set('spine_01', -torsoX * 0.25 - breathing, torsoY * 0.25, torsoZ * 0.25);
@@ -884,7 +929,7 @@ export class Avatar {
     const k = Math.min(1, dt * 12);
     const lerp = (obj, prop, v) => { obj[prop] += (v - obj[prop]) * k; };
     // Rotation signs: +x swings a limb forward (toward -z, the way the character faces); +z on the right arm swings it outward.
-    let legL = 0, legR = 0, armL = 0, armR = 0, armLz = -0.06, armRz = 0.06, elbowL = 0.12, elbowR = 0.12, torsoX = 0, torsoY = 0, torsoZ = 0, rootY = 0, headX = 0, headY = 0, legY = 0.76, legZ = 0, kneeL = 0, kneeR = 0;
+    let legL = 0, legR = 0, armL = 0, armR = 0, armRy = 0, armLz = -0.06, armRz = 0.06, elbowL = 0.12, elbowR = 0.12, pelvisX = 0, torsoX = 0, torsoY = 0, torsoZ = 0, rootY = 0, headX = 0, headY = 0, legY = 0.76, legZ = 0, kneeL = 0, kneeR = 0, footL = 0, footR = 0;
     const T = this.t;
     if (state !== this.lastState) { this.lastState = state; this.stateT = 0; }
     this.stateT = (this.stateT || 0) + dt;
@@ -937,9 +982,11 @@ export class Avatar {
     } else if (state === 'swim') {
       this.phase += dt * 4;
       const s = Math.sin(this.phase);
-      torsoX = 1.1; rootY = 0.24; headX = 0.85;
-      armL = 2.5 + s * 0.7; armR = 2.5 - s * 0.7; armLz = -0.35; armRz = 0.35;
-      legL = -1.3 + s * 0.35; legR = -1.3 - s * 0.35;
+      pelvisX = -1.05; torsoX = 0.18; rootY = 0.15; headX = 1.1;
+      armL = 0.95 + s * 0.32; armR = 0.95 - s * 0.32; armLz = -0.14; armRz = 0.14;
+      legL = s * 0.2; legR = -s * 0.2;
+      kneeL = -0.22 - Math.max(0, s) * 0.42; kneeR = -0.22 - Math.max(0, -s) * 0.42;
+      footL = -0.08; footR = -0.08;
     } else if (state === 'air') {
       legL = 0.5; legR = -0.3; kneeL = -0.7; kneeR = -0.35; armL = 0.4; armR = 0.3; armLz = -0.45; armRz = 0.45;
     } else if (state === 'helm') {
@@ -959,19 +1006,39 @@ export class Avatar {
       armR = 1.42 + (o.look || 0) * 0.9 + (o.kick || 0) * 0.5; armRz = -0.05;
       elbowR = -0.2;
       if (this.item !== 'pistol') { armL = 1.3 + (o.look || 0) * 0.9 + (o.kick || 0) * 0.5; armLz = 0.42; elbowL = -0.2; torsoY = 0.25; }
+    } else if (o.swing > 0 && this.item === 'cutlass') {
+      const p = 1 - o.swing;
+      const smooth = (a, b, x) => {
+        const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+        return t * t * (3 - 2 * t);
+      };
+      if (p < 0.24) {
+        const t = smooth(0, 0.24, p);
+        armR = 0.35 + t * 0.55; armRy = -0.18 - t * 0.36; armRz = 0.12 + t * 0.18;
+        elbowR = -0.24 - t * 0.28; torsoY -= t * 0.12;
+      } else if (p < 0.72) {
+        const t = smooth(0.24, 0.72, p);
+        armR = 0.9 - t * 0.68; armRy = -0.54 + t * 1.22; armRz = 0.3 - t * 0.2;
+        elbowR = -0.52 + t * 0.42; torsoY += 0.28 * Math.sin(t * Math.PI * 0.5);
+      } else {
+        const t = smooth(0.72, 1, p);
+        armR = 0.22 + t * 0.16; armRy = 0.68 * (1 - t); armRz = 0.1 * (1 - t) + 0.06 * t;
+        elbowR = -0.1 * (1 - t) + 0.12 * t; torsoY += 0.28 * (1 - t);
+      }
     } else if (o.swing > 0) {
       const p = 1 - o.swing;
       armR = p < 0.25 ? 0.4 + (p / 0.25) * 2.3 : 2.7 - ((p - 0.25) / 0.75) * 2.2;
       armRz = 0.2; torsoY += Math.sin(p * Math.PI) * 0.25;
     } else if (this.item && (state === 'idle' || state === 'walk' || state === 'run')) armR = Math.max(armR, 0.35);
     if (this.humanRig) {
-      this.poseHuman(state, dt, o, { legL, legR, kneeL, kneeR, armL, armR, armLz, armRz, elbowL, elbowR, torsoX, torsoY, torsoZ, rootY, headX, headY });
+      this.poseHuman(state, dt, o, { legL, legR, kneeL, kneeR, footL, footR, armL, armR, armRy, armLz, armRz, elbowL, elbowR, pelvisX, torsoX, torsoY, torsoZ, rootY, headX, headY });
       return;
     }
     lerp(this.legL.rotation, 'x', legL); lerp(this.legR.rotation, 'x', legR);
     lerp(this.legL.shin.rotation, 'x', state === 'swim' ? 0 : kneeL); lerp(this.legR.shin.rotation, 'x', state === 'swim' ? 0 : kneeR);
     lerp(this.torso.rotation, 'z', torsoZ); lerp(this.head.rotation, 'y', headY);
     lerp(this.armL.rotation, 'x', armL); lerp(this.armR.rotation, 'x', armR);
+    lerp(this.armR.rotation, 'y', armRy);
     lerp(this.armL.rotation, 'z', armLz); lerp(this.armR.rotation, 'z', armRz);
     lerp(this.armL.elbow.rotation, 'x', elbowL); lerp(this.armR.elbow.rotation, 'x', elbowR);
     lerp(this.torso.rotation, 'x', -torsoX); lerp(this.torso.rotation, 'y', torsoY);

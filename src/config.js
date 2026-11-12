@@ -1,5 +1,5 @@
 // Shared constants for Brinebound (working title). VERSION below is the one shown on the title screen.
-export const VERSION = '0.6.38';
+export const VERSION = '0.6.42';
 export const WS = 3;                     // world scale: 0.6 made the islands and the sea between them 3x wider (10x the area)
 export const WORLD_Y_SHIFT = 48;         // raise the old world to make room for deeper mines below it
 export const LEGACY_W = 384 * WS, LEGACY_D = 384 * WS; // map dimensions used by 0.6.15 saves and island placement

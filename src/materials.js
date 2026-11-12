@@ -109,7 +109,7 @@ float macro = texture2D(uDetail, vWPos.xz * 0.019).a;
 vec3 base = mix(vCol2, vColor.rgb, top);
 diffuseColor.rgb *= base * (0.6 + 0.66 * det) * (0.86 + 0.28 * macro);`)
       .replace('#include <normal_fragment_begin>', leaf ? '#include <normal_fragment_begin>' : `#include <normal_fragment_begin>
-normal = brineReliefNormal(-vViewPosition, normalize(normal), det, 0.22);`)
+normal = brineReliefNormal(-vViewPosition, normalize(normal), det, 0.06);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += base * vGlow * (0.9 + 0.5 * det);`);
   };

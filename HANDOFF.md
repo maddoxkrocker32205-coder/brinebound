@@ -1,6 +1,6 @@
 # Brinebound: hand-off guide
 
-Version 0.6.38. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
+Version 0.6.42. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
 
 ## Starter prompt
 
@@ -143,6 +143,9 @@ The game was built and published inside the Claude app, which gives the page a `
 
 ## Version history
 
+- **0.6.42:** reduce terrain shader cost by reusing the existing detail sample for softer relief instead of adding extra texture fetches.
+- **0.6.41:** preserve mid-scale terrain detail while softening fine grain and surface relief to reduce the fuzzy appearance of island ground.
+- **0.6.40:** retarget character poses to the imported rig’s movement axes, lift the swimming gaze, smooth the swim and cutlass cycles, and reshape pirate hats to fit the head.
 - **0.6.38:** replace the rectangular outpost cut with a curving, widening dock inlet and a sloped sandy edge.
 - **0.6.37:** fix the terrain relief shader placement so island ground renders instead of disappearing.
 - **0.6.36:** add light-reactive relief shading to block materials and bevel generated structure details to give timber, stone and cloth surfaces more depth.

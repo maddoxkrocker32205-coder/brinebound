@@ -464,16 +464,16 @@ export function makeDetailTexture(renderer) {
     const u = x / N, v = y / N;
     // sand: fine grain over soft ripples
     const ripple = 0.5 + 0.5 * Math.sin((v * 22 + n8(u * 8, v * 8) * 3.2) * Math.PI * 2);
-    const sand = 0.5 + (n128(u * 128, v * 128) - 0.5) * 0.55 + (n64(u * 64, v * 64) - 0.5) * 0.25 + (ripple - 0.5) * 0.16;
+    const sand = 0.5 + (n128(u * 128, v * 128) - 0.5) * 0.2 + (n64(u * 64, v * 64) - 0.5) * 0.28 + (ripple - 0.5) * 0.16;
     // grass: clumps of light and dark with flecks
     const cl1 = n16(u * 16, v * 16), cl2 = n32(u * 32, v * 32), fl = n128(u * 128 + 7, v * 128 + 3);
-    const grass = 0.5 + (cl1 - 0.5) * 0.7 + (cl2 - 0.5) * 0.45 + (fl > 0.78 ? 0.18 : fl < 0.2 ? -0.14 : 0);
+    const grass = 0.5 + (cl1 - 0.5) * 0.7 + (cl2 - 0.5) * 0.45 + (fl > 0.78 ? 0.06 : fl < 0.2 ? -0.05 : 0);
     // rock: cracked plates with mottling and faint layers
     const [a1, a2] = w12(u * 12, v * 12), [b1, b2] = w6(u * 6, v * 6);
     const crack = Math.min(1, (a2 - a1) * 6) * 0.65 + Math.min(1, (b2 - b1) * 5) * 0.35;
-    const rock = 0.36 + crack * 0.34 + (n32(u * 32 + 5, v * 32) - 0.5) * 0.3 + (n64(u * 64, v * 64 + 9) - 0.5) * 0.14;
+    const rock = 0.36 + crack * 0.34 + (n32(u * 32 + 5, v * 32) - 0.5) * 0.25 + (n64(u * 64, v * 64 + 9) - 0.5) * 0.07;
     // dirt and large-scale tint
-    const dirt = 0.5 + (n4(u * 4, v * 4) - 0.5) * 0.5 + (n16(u * 16 + 3, v * 16 + 8) - 0.5) * 0.4 + (n64(u * 64 + 1, v * 64 + 2) - 0.5) * 0.25;
+    const dirt = 0.5 + (n4(u * 4, v * 4) - 0.5) * 0.5 + (n16(u * 16 + 3, v * 16 + 8) - 0.5) * 0.45 + (n64(u * 64 + 1, v * 64 + 2) - 0.5) * 0.1;
     const i = (x + y * N) * 4;
     data[i] = cl(sand); data[i + 1] = cl(grass); data[i + 2] = cl(rock); data[i + 3] = cl(dirt);
   }
