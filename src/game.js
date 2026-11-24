@@ -114,7 +114,7 @@ export class Game {
     this.tpDist = 4.2; this.shakeAmt = 0; this.previewYaw = 0;
     this.mine = { x: 0, y: 0, z: 0, p: 0 }; this.mineSoundT = 0; this.vmSwing = 0;
     this.repairCD = 0; this.visT = 0; this.saveT = 0; this.lightT = 0; this.creakT = 4; this.flagT = 0;
-    this.perfT = 0; this.perfFrames = 0; this.slowT = 0;
+    this.perfT = 0; this.perfFrames = 0; this.slowT = 0; this.fastT = 0; this.resScale = 1;
     this.look = defaultLook();
     this.resetProgress();
     this.avatar = new Avatar(this.look);
@@ -158,7 +158,8 @@ export class Game {
   }
   applySettings() {
     const S = this.settings, q = this.qualityPreset();
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, q.ratio));
+    if (S.get('quality') !== 'auto') this.resScale = 1;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, q.ratio) * this.resScale);
     this.renderer.setSize(innerWidth, innerHeight);
     this.sky.setQuality(q);
     this.world.setShadows(q.shadows > 0);
@@ -168,20 +169,31 @@ export class Game {
     this.sfx.setVolume(S.get('volume')); this.sfx.setMusic(S.get('music'));
     this.visT = 0;
   }
-  // When quality is on Auto and the frame rate stays low, step down one level (never back up mid-session).
+  // Auto lowers resolution first; sustained headroom restores it without changing the preset.
   perf(dt) {
-    if (this.state !== 'play') { this.perfT = 0; this.perfFrames = 0; return; }
-    this.perfT += dt; this.perfFrames++;
+    if (this.state !== 'play' || dt <= 0 || document.hidden) { this.perfT = 0; this.perfFrames = 0; this.slowT = 0; this.fastT = 0; return; }
+    this.perfT += Math.min(dt, 1); this.perfFrames++;
     if (this.perfT < 2) return;
     const fps = this.perfFrames / this.perfT;
     this.perfT = 0; this.perfFrames = 0;
-    if (this.settings.get('quality') !== 'auto') return;
+    if (this.settings.get('quality') !== 'auto') { this.slowT = 0; this.fastT = 0; return; }
     this.slowT = fps < 28 ? this.slowT + 2 : 0;
+    this.fastT = fps >= 29 ? this.fastT + 2 : 0;
     const i = QUALITY_ORDER.indexOf(this.autoQ);
-    if (this.slowT >= 6 && i < QUALITY_ORDER.length - 1) {
-      this.slowT = 0; this.autoQ = QUALITY_ORDER[i + 1];
+    if (this.slowT >= 6) {
+      this.slowT = 0;
+      if (this.resScale > 0.65) {
+        this.resScale = Math.max(0.65, Math.round((this.resScale - 0.1) * 100) / 100);
+        this.applySettings();
+      } else if (i < QUALITY_ORDER.length - 1) {
+        this.autoQ = QUALITY_ORDER[i + 1];
+        this.applySettings();
+        this.ui.pickup(`Graphics set to ${this.autoQ} for speed`);
+      }
+    } else if (this.fastT >= 12 && this.resScale < 1) {
+      this.fastT = 0;
+      this.resScale = Math.min(1, Math.round((this.resScale + 0.1) * 100) / 100);
       this.applySettings();
-      this.ui.pickup(`Graphics set to ${this.autoQ} for speed`);
     }
   }
 
@@ -572,11 +584,12 @@ export class Game {
   // ---------------------------------------------------------------- loop
   loop(now) {
     requestAnimationFrame(this.loop);
-    const dt = Math.min(0.05, Math.max(0, (now - (this.last || now)) / 1000));
+    const elapsed = Math.max(0, (now - (this.last || now)) / 1000);
+    const dt = Math.min(0.05, elapsed);
     this.last = now;
-    this.frame(dt);
+    this.frame(dt, elapsed);
   }
-  frame(dt) {
+  frame(dt, elapsed = dt) {
     this.waveTime += dt;
     shared.time.value = this.waveTime;
     try {
@@ -606,7 +619,7 @@ export class Game {
       this.renderer.autoClear = true;
     }
     this.input.endFrame();
-    this.perf(dt);
+    this.perf(elapsed);
   }
   // emotes: G (or the Emote button) opens a wheel of eight
   openWheel() {
@@ -962,6 +975,13 @@ export class Game {
   cameraYaw() { return this.player.mode === 'helm' && this.sloop ? this.sloop.heading + this.helmYaw : this.player.yaw; }
   cameraBearing() { return -this.cameraYaw(); }
   distToListener(x, z) { return Math.hypot(x - this.camera.position.x, z - this.camera.position.z); }
+  panToListener(x, z) {
+    const dx = x - this.camera.position.x, dz = z - this.camera.position.z, d = Math.hypot(dx, dz);
+    if (d < 0.001) return 0;
+    const q = this.camera.quaternion;
+    const rx = 1 - 2 * (q.y * q.y + q.z * q.z), rz = 2 * (q.x * q.z - q.y * q.w);
+    return clamp((dx * rx + dz * rz) / d, -1, 1);
+  }
   shake(a) { this.shakeAmt = Math.max(this.shakeAmt, a); }
 
   updateCamera(dt) {
@@ -1369,7 +1389,7 @@ export class Game {
     const m = s.muzzle(i);
     this.particles.burst(m.x, m.y, m.z, 0xffb347, 8, 2.5, 1.5, 0, 0.18, 0.2);
     this.physics.puffs.add(m.x + m.dx * 0.8, m.y + 0.2, m.z + m.dz * 0.8, { color: 0xb9bcbf, size: 1.1, grow: 2.2, life: 1.6, opacity: 0.55, vx: m.dx * 2, vy: 0.6, vz: m.dz * 2 });
-    this.sfx.boom(this.distToListener(m.x, m.z));
+    this.sfx.boom(this.distToListener(m.x, m.z), this.panToListener(m.x, m.z));
   }
   // the outline around just the part of a building piece being aimed at
   fitHighlight(hit) {

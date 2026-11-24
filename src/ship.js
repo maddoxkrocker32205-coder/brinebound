@@ -974,6 +974,6 @@ export function fireBroadside(G, ship, side, target, count) {
     G.particles.burst(ox, oy, oz, 0xffb347, 6, 2.5, 1.5, 0, 0.18, 0.2);
     G.particles.burst(ox + rx * 0.6, oy + 0.2, oz + rz * 0.6, 0x9a9da0, 7, 1.2, 1.6, -1.5, 1.3, 0.5);
   }
-  G.sfx.boom(G.distToListener(ship.pos.x, ship.pos.z));
+  G.sfx.boom(G.distToListener(ship.pos.x, ship.pos.z), G.panToListener(ship.pos.x, ship.pos.z));
   return idx.length;
 }

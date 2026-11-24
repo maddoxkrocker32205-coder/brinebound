@@ -293,6 +293,6 @@ export class Guns {
     _m.set(x, y, z);
     this.tracers.add(_m, _p.copy(_m).addScaledVector(_d, Math.min(30, D.range)), 0.014);
     this.flash(x, y, z, D, _d);
-    G.sfx.gun && G.sfx.gun(D.sound, G.distToListener(x, z));
+    G.sfx.gun && G.sfx.gun(D.sound, G.distToListener(x, z), G.panToListener(x, z));
   }
 }
