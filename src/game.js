@@ -33,6 +33,7 @@ import { SaveSystem, packEdits, unpackEdits } from './save.js';
 import { Settings, QUALITY, VIEW } from './settings.js';
 import { UPGRADES, SUPPLIES, VESSELS, vesselProgress } from './shop.js';
 import { Net } from './net.js';
+import { BattleRoyale } from './battle-royale.js';
 
 const START_INV = { cutlass: 1, pick: 1, hook: 1, hammer: 1, pistol: 1, shot: 12, wood: 0, plank: 14, stone: 0, brick: 0, sand: 0, dirt: 0, lantern: 2, coconut: 3, grog: 1, ball: 12, bone: 0 };
 const QUALITY_ORDER = ['ultra', 'high', 'medium', 'low'];
@@ -261,6 +262,7 @@ export class Game {
       player: { x: P.pos.x, y: P.pos.y, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, hp: P.hp, hunger: P.hunger, onShip, lx: P.local.x, lz: P.local.z },
       ship: s && !s.sinking ? { x: s.pos.x, z: s.pos.z, h: s.heading, hp: s.hp } : null,
       quests: this.quests.serialize(),
+      battleRoyale: this.battleRoyale ? this.battleRoyale.serialize() : null,
     };
   }
   meta() {
@@ -273,7 +275,7 @@ export class Game {
     return { meta: this.meta(), data };
   }
   hotSnapshot() {
-    if ((this.state === 'play' || this.state === 'sheet') && this.player.alive) {
+    if ((this.state === 'play' || this.state === 'sheet') && (this.player.alive || this.battleRoyale?.result === 'lost')) {
       try {
         if (this.net.inCrew) { this.lastHot = { v: 3, doc: this.net.crewDoc() }; return this.lastHot; }
         const data = this.serialize();
@@ -284,26 +286,36 @@ export class Game {
     return this.lastHot || {};
   }
   saveLocalNow() {
-    if ((this.state !== 'play' && this.state !== 'sheet') || !this.player.alive) return;
+    if ((this.state !== 'play' && this.state !== 'sheet') || (!this.player.alive && this.battleRoyale?.result !== 'lost')) return;
     try {
       if (this.net.inCrew) { this.saves.writeLocal('auto', this.net.crewDoc()); return; }
       const data = this.serialize();
       data.editsRaw = Array.from(this.world.edits);
-      this.saves.writeLocal('auto', { meta: this.meta(), data });
+      this.saves.writeLocal(this.battleRoyale ? 'royale' : 'auto', { meta: this.meta(), data });
     } catch (e) { /* storage full or unavailable */ }
   }
   async autosave(reason = 'timer', force = false) {
-    if ((this.state !== 'play' && this.state !== 'sheet') || !this.player.alive || this.saving) return false;
+    if ((this.state !== 'play' && this.state !== 'sheet') || (!this.player.alive && this.battleRoyale?.result !== 'lost')) return false;
+    if (this.saving) {
+      if (this.battleRoyale?.result === 'lost') this.pendingRoyaleLoss = this.battleRoyale;
+      return false;
+    }
     const now = performance.now();
     if (!force && now - (this.lastSave || 0) < 20000) return false;
     this.saving = true;
     try {
+      const match = this.battleRoyale, slot = match ? 'royale' : 'auto';
       const doc = await this.buildDoc();
-      await this.saves.write('auto', doc);
-      this.lastSave = now; this.latest = { slot: 'auto', doc };
+      if (match !== this.battleRoyale || (match && doc.data.battleRoyale?.result !== match.result)) return false;
+      await this.saves.write(slot, doc);
+      this.lastSave = now; if (slot === 'auto') this.latest = { slot, doc };
       return true;
     } catch (e) { console.warn('Autosave failed', reason, e); return false; }
-    finally { this.saving = false; }
+    finally {
+      this.saving = false;
+      const pending = this.pendingRoyaleLoss; this.pendingRoyaleLoss = null;
+      if (pending && pending === this.battleRoyale && pending.result === 'lost') this.autosave('challenge-elimination', true);
+    }
   }
   async saveToSlot(slot) {
     let ok = false;
@@ -349,6 +361,8 @@ export class Game {
   async importText(text) { const doc = this.saves.parseFile(text); await this.loadDoc(doc); }
 
   clearVoyage() {
+    if (this.battleRoyale) { this.battleRoyale.dispose(); this.battleRoyale = null; }
+    document.getElementById('royaleStatus').classList.add('hidden');
     for (const h of this.hollows) h.dispose();
     this.hollows = [];
     this.killKraken();
@@ -456,6 +470,7 @@ export class Game {
       P.mode = 'foot'; P.pos.set(p.x ?? sp.x, p.y ?? SEA + 8, p.z ?? sp.z); P.yaw = p.yaw || 0; P.pitch = p.pitch || 0;
       if (P.collides()) P.pos.y = this.world.standY(Math.floor(P.pos.x), Math.floor(P.pos.z)) + 0.001;
     }
+    if (d.battleRoyale && typeof d.battleRoyale === 'object') this.battleRoyale = new BattleRoyale(this, d.battleRoyale);
   }
   newVoyage(look) {
     this.net.end();
@@ -472,11 +487,18 @@ export class Game {
     P.alive = true; P.hp = P.maxHp; P.hunger = 100;
     this.placeAtSpawn();
   }
-  beginVoyage(look, showGuide = true) {
+  beginVoyage(look, showGuide = true, mode = 'voyage') {
     this.sheets.close();
     this.newVoyage(look);
-    this.hints.tutorialStep = showGuide ? 0 : 6;
+    if (mode === 'royale') this.wantCrew = false;
+    this.hints.tutorialStep = mode === 'royale' ? 6 : showGuide ? 0 : 6;
+    if (mode === 'royale') this.battleRoyale = new BattleRoyale(this);
     this.startPlay();
+    if (this.battleRoyale) {
+      this.ui.toast('Solo survival challenge', 'Survive the shrinking circle for five minutes. Gold markers on the chart show timed supply drops.', '');
+      this.autosave('new', true);
+      return;
+    }
     this.ui.toast('Brine Haven', `Welcome, ${this.look.name}. Old Mags keeps the trading post up the beach, and your sloop waits at the pier.`);
     this.after(7, () => this.ui.toast('Landfall', this.isTouch ? 'Hold Hit on a tree trunk to gather wood. The View button shows your captain.' : 'Hold left click on a tree trunk to gather wood. Press V to see your captain.'));
     this.autosave('new', true);
@@ -498,6 +520,7 @@ export class Game {
   startPlay() {
     this.sfx.init();
     this.state = 'play';
+    if (this.battleRoyale) this.battleRoyale.group.visible = true;
     this.ui.netNote(null);
     this.ui.showTitle(false);
     this.ui.showHud(true);
@@ -515,6 +538,7 @@ export class Game {
     this.net.end();
     this.sheets.close();
     this.state = 'title';
+    if (this.battleRoyale) this.battleRoyale.group.visible = false;
     this.input.exitLock();
     this.ui.showHud(false);
     this.ui.showTitle(true);
@@ -819,6 +843,8 @@ export class Game {
     this.weather.update(dt);
     this.life.update(dt);
     this.fauna.update(dt);
+    if (this.battleRoyale) this.battleRoyale.update(dt);
+    this.updateRoyaleStatus();
     this.world.processDirty(3);
     this.ocean.flushDepth(this.world);
     this.updateCamera(dt);
@@ -2048,6 +2074,7 @@ export class Game {
       return;
     }
     this.stats.ships++;
+    this.quests.onShipSunk(ship);
     if (ship.kind !== 'hollow') {
       const L = Math.min(10, this.level), k = ship.kind;
       const loot = k === 'merchant' ? 80 + L * 20 : k === 'navy' ? 140 + L * 25 : 100 + L * 25;
@@ -2061,7 +2088,6 @@ export class Game {
       this.after(10, () => { if (this.hollows.includes(ship)) this.removeHollow(ship); });
       return;
     }
-    this.quests.onShipSunk(ship);
     const L = Math.min(10, this.level);
     const loot = ship.variant === 'flagship' ? 320 + L * 30 : 70 + L * 30;
     this.props.spawnLoot(ship.pos.x, ship.pos.z, loot);
@@ -2139,6 +2165,17 @@ export class Game {
   onPlayerDeath() {
     const P = this.player;
     if (P.mode === 'helm') { if (this.net.inCrew) this.net.leaveHelm(); else if (this.sloop) this.sloop.sailLvl = 0; }
+    if (this.battleRoyale?.active) {
+      this.battleRoyale.result = 'lost';
+      this.battleRoyale.syncVisuals();
+      this.quests.onPlayerDeath();
+      this.saveLocalNow();
+      this.autosave('challenge-elimination', true);
+      this.ui.fade(true);
+      this.ui.toast('Challenge lost', 'You died. The match is over; you will respawn to explore, not re-enter the match.', 'bad');
+      this.after(2.6, () => { this.respawn(); this.onRoyaleEnd(); });
+      return;
+    }
     const lost = this.gold, lostLoot = this.dropLoot();
     this.gold = 0;
     if (!this.net.inCrew) this.quests.onPlayerDeath();
@@ -2153,6 +2190,19 @@ export class Game {
     if (s && !s.sinking) this.boardSloop(0, 1.6);
     else this.placeAtSpawn();
     this.ui.fade(false);
+  }
+  updateRoyaleStatus() {
+    const el = document.getElementById('royaleStatus'), br = this.battleRoyale;
+    el.classList.toggle('hidden', !br || !br.active);
+    if (!br || !br.active) return;
+    const left = Math.ceil(75 * 4 - br.elapsed);
+    const outside = Math.hypot(this.player.pos.x - br.x, this.player.pos.z - br.z) > br.radius;
+    el.textContent = `Solo ${br.phase + 1}/4 · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} · ${outside ? br.stage.toUpperCase() : 'SAFE'}`;
+  }
+  onRoyaleEnd() {
+    this.updateRoyaleStatus();
+    this.autosave('challenge-end', true);
+    this.openSheet('royaleResult');
   }
   onKrakenDefeated() {
     this.weather.forced = 0;

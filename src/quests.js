@@ -12,7 +12,9 @@ const STORY = [
   { id: 'home', title: 'Homecoming' },
   { id: 'free', title: 'Free Sailing' },
 ];
-const NAMES = { mags: 'Old Mags', tallow: 'Brother Tallow' };
+const NAMES = { mags: 'Old Mags', tallow: 'Brother Tallow', ironhook: 'Captain Ironhook', seer: 'Mystic Seer', blackstone: 'Admiral Blackstone' };
+const NEW_GIVERS = ['ironhook', 'seer', 'blackstone'];
+const GIVER_KINDS = { ironhook: ['privateer', 'escape', 'rescue'], seer: ['prophecy', 'escape'], blackstone: ['territory', 'privateer', 'rescue'] };
 const LORE = [
   'Whoever finds this: the Hollow Wake only fires when you show her your side. Keep your bow on her.',
   'Day 41. The Hollowmen will not cross lantern light. Build bright, sleep easy.',
@@ -28,7 +30,7 @@ export class Quests {
   constructor(G) { this.g = G; this.reset(); }
   reset() {
     this.step = 0; this.phase = 0; this.flags = {};
-    this.active = []; this.offers = { mags: [], tallow: [] }; this.nextId = 1;
+    this.active = []; this.offers = { mags: [], tallow: [], ironhook: [], seer: [], blackstone: [] }; this.nextId = 1;
     this.discovered = [0]; this.camps = {}; this.bottles = [];
     this.tracked = 'story'; this.offerDay = -1; this.bottleT = 25; this.discT = 0;
     this.storyChests = {}; this.huntTimers = {};
@@ -66,6 +68,8 @@ export class Quests {
   load(s) {
     this.reset();
     Object.assign(this, { step: s.step || 0, phase: s.phase || 0, flags: s.flags || {}, active: s.active || [], offers: s.offers || { mags: [], tallow: [] }, nextId: s.nextId || 1, discovered: s.discovered || [0], camps: s.camps || {}, tracked: s.tracked || 'story', offerDay: s.offerDay ?? -1, storyChests: s.storyChests || {}, stats: s.stats || { contracts: 0, bottles: 0 } });
+    for (const npc of ['mags', 'tallow', ...NEW_GIVERS]) if (!Array.isArray(this.offers[npc])) this.offers[npc] = [];
+    for (const npc of NEW_GIVERS) if (!this.offers[npc].length) this.fillNewOffers(npc);
     if (!this.camps.story) { const site = this.g.world.sites.camp; if (site) this.camps.story = { id: 'story', island: site.island, x: site.x, z: site.z, y: site.y, fire: site.fire, total: 6, killed: 0, captainDead: false, active: this.step >= 3, cleared: false }; }
     this.fortCamp();
     for (const b of s.bottles || []) this.g.props.spawnBottle(b.x, b.z, b.data);
@@ -127,6 +131,65 @@ export class Quests {
       if (q.kind === 'supply' && q.state === 'active' && this.has(q.item, q.need)) { q.state = 'ready'; G.ui.pickup(`${q.title}: ready to hand in`); }
       if (q.kind === 'supply' && q.state === 'ready' && !this.has(q.item, q.need)) q.state = 'active';
       if (q.kind === 'explore' && q.state === 'active' && this.discovered.length >= G.world.islands.length) { q.state = 'ready'; G.ui.toast('Every island charted', 'Show your chart to Old Mags.', 'good'); }
+      const camp = this.camps[q.camp];
+      if (q.kind === 'rescue' && q.state === 'active' && q.escorting && q.survivor && P.alive) {
+        const s = q.survivor, distance = Math.hypot(P.pos.x - s.x, P.pos.z - s.z);
+        if (P.mode === 'foot' && distance > 2 && distance < 35) {
+          const speed = Math.min(distance - 2, dt * 2.8), dx = (P.pos.x - s.x) / distance * speed, dz = (P.pos.z - s.z) / distance * speed;
+          for (const [mx, mz] of [[dx, dz], [dx, 0], [0, dz], [-dz, dx], [dz, -dx]]) {
+            if (Math.hypot(mx, mz) < 0.001) continue;
+            const y = G.world.walkStep(s.x, s.y, s.z, s.x + mx, s.z + mz, 1.05, 3.5, SEA);
+            if (!Number.isNaN(y)) { s.x += mx; s.z += mz; s.y = y; break; }
+          }
+        }
+        q.waveTimer = (q.waveTimer || 0) - dt;
+        if (q.waveTimer <= 0 && distance < 35 && P.mode === 'foot') {
+          q.waveTimer = 15; G.enemies.spawnNear(s.x, s.z, 2, 8, 12, { kind: 'guard' });
+        }
+        q.hitTimer = Math.max(0, (q.hitTimer || 0) - dt);
+        if (!q.hitTimer && G.enemies.list.some((e) => e.state !== 'dying' && !e.dead && Math.hypot(e.pos.x - s.x, e.pos.z - s.z) < 1.8 && Math.abs(e.pos.y - s.y) < 3)) {
+          q.hitTimer = 1; s.hp = Math.max(0, s.hp - 10);
+          if (!s.hp) { q.state = 'lost'; if (camp) camp.active = false; G.ui.toast('The sailor fell', 'The rescue failed. Abandon the contract and try another.', 'bad'); }
+        }
+        if (q.state === 'active' && G.sloop && (P.mode === 'helm' || (P.mode === 'deck' && (!P.ship || P.ship === G.sloop))) && Math.hypot(G.sloop.pos.x - s.x, G.sloop.pos.z - s.z) < 16) {
+          q.reward = Math.round(q.reward * (s.hp >= 90 ? 1.5 : s.hp >= 50 ? 1.25 : 1));
+          q.state = 'ready'; if (camp) camp.active = false;
+          G.ui.toast('Sailor aboard', `They are safe. Report to ${NAMES[q.giver]}.`, 'good');
+        }
+      }
+      if (q.kind === 'territory' && q.state === 'active' && camp && camp.cleared) {
+        const present = P.alive && P.mode === 'foot' && Math.hypot(P.pos.x - camp.x, P.pos.z - camp.z) < 12 && Math.abs(P.pos.y - camp.y) < 5;
+        if (present) {
+          if (!q.held) { q.damage = 0; q.lastHp = P.hp; q.wave = -1; }
+          q.damage += Math.max(0, q.lastHp - P.hp); q.lastHp = P.hp;
+          q.held = Math.min(60, (q.held || 0) + dt);
+          const wave = Math.floor(q.held / 15);
+          if (wave < 4 && wave > q.wave) { q.wave = wave; G.enemies.spawnNear(camp.x, camp.z, 2, 8, 11, { kind: 'guard' }); }
+          if (q.held >= 60) {
+            q.reward = Math.round(q.reward * (q.damage < 10 ? 1.5 : q.damage < 35 ? 1.25 : 1));
+            q.state = 'ready'; G.ui.toast('Ground secured', `Report to ${NAMES[q.giver]}.`, 'good');
+          }
+        } else { q.held = 0; q.lastHp = null; }
+      }
+      if (q.kind === 'escape' && q.state === 'active' && camp && P.alive) {
+        if (!q.entered && P.mode === 'foot' && Math.hypot(P.pos.x - camp.x, P.pos.z - camp.z) < 12 && Math.abs(P.pos.y - camp.y) < 5) {
+          q.entered = true; q.elapsed = 0; q.wave = -1; q.damage = 0; q.lastHp = P.hp;
+          G.ui.toast('The watch is alerted', 'Get aboard your ship and sail 100 paces clear within 90 seconds.', 'curse');
+        }
+        if (q.entered) {
+          q.elapsed += dt; q.damage += Math.max(0, q.lastHp - P.hp); q.lastHp = P.hp;
+          const wave = Math.floor(q.elapsed / 15);
+          if (P.mode === 'foot' && wave > q.wave) { q.wave = wave; G.enemies.spawnNear(P.pos.x, P.pos.z, 2, 8, 13, { kind: 'guard' }); }
+          if (q.elapsed <= 90 && G.sloop && (P.mode === 'helm' || (P.mode === 'deck' && (!P.ship || P.ship === G.sloop))) && Math.hypot(G.sloop.pos.x - camp.x, G.sloop.pos.z - camp.z) >= 100) {
+            const multiplier = q.elapsed <= 45 && q.damage < 10 ? 1.5 : q.elapsed <= 70 && q.damage < 35 ? 1.25 : 1;
+            q.reward = Math.round(q.reward * multiplier); q.state = 'ready'; camp.active = false;
+            G.ui.toast('Clear of the island', `Report to ${NAMES[q.giver]}.`, 'good');
+          } else if (q.elapsed > 90) {
+            q.entered = false;
+            G.ui.toast('The trail went cold', 'Return to the camp to try the escape again.', 'bad');
+          }
+        }
+      }
     }
   }
   deepSpot() {
@@ -294,6 +357,25 @@ export class Quests {
     const L = this.level();
     const pick = (a) => a[(Math.random() * a.length) | 0];
     const oid = 'o' + this.nextId++;
+    if (GIVER_KINDS[npc]) {
+      const kinds = GIVER_KINDS[npc].filter((kind) => !this.active.some((q) => q.kind === kind));
+      const islands = this.g.world.islands.map((island, i) => ({ island, i })).filter(({ island, i }) =>
+        i !== 0 && island.name !== 'Lantern Cay' && !['volcano', 'sandbar', 'atoll'].includes(island.type)
+        && !this.g.world.sites.villages.some((v) => v.island === i)
+        && !Object.values(this.camps).some((c) => c.island === i && !c.cleared && c.active));
+      if (!kinds.length) return null;
+      const kind = pick(kinds);
+      if (kind !== 'privateer' && !islands.length) return null;
+      const island = kind === 'privateer' ? null : pick(islands);
+      const details = {
+        prophecy: ['The Seer’s riddle', `“Where five marks meet, the buried answer sleeps.” Search the marked circle on ${island ? island.island.name : ''}, dig beneath the X, and report to the Seer.`, 180],
+        rescue: ['Rescue a stranded sailor', `Defeat the Hollowmen captain on ${island ? island.island.name : ''}, speak to the sailor, and escort them to your ship. Protect them from pursuing waves; safer rescues earn more.`, 260],
+        territory: ['Secure the old camp', `Clear the Hollowmen camp on ${island ? island.island.name : ''}, then hold it on foot for 60 uninterrupted seconds against waves. Less damage earns more pay.`, 280],
+        escape: ['Run the gauntlet', `Reach the Hollowmen camp on ${island ? island.island.name : ''}, then escape aboard your ship and sail 100 paces clear within 90 seconds. Speed and safety improve your pay.`, 210],
+        privateer: ['Privateer commission', 'Sink two pirate ships, then report back. Merchant and navy ships do not count.', 300],
+      }[kind];
+      return { oid, kind, giver: npc, island: island ? island.i : undefined, title: details[0], desc: details[1], reward: details[2] + L * 20 };
+    }
     const frontier = this.g.world.islands.map((island, i) => ({ island, i })).filter(({ island, i }) =>
       island.frontier && !this.discovered.includes(i) && !(this.flags.expeditionsComplete || {})[island.name]
       && !this.active.some((q) => q.kind === 'expedition' && q.island === i));
@@ -338,6 +420,7 @@ export class Quests {
     let o = null;
     for (let tries = 0; tries < 24; tries++) {
       o = this.genOffer(npc);
+      if (!o) return null;
       const clash = list.some((x) => x.title === o.title || (x.kind === o.kind && (o.kind === 'explore' || o.kind === 'hunt')));
       const busy = (o.kind === 'explore' && this.active.some((q) => q.kind === 'explore')) || (o.kind === 'hunt' && this.active.some((q) => q.kind === 'hunt'))
         || (o.kind === 'expedition' && this.active.some((q) => q.kind === 'expedition' && q.island === o.island));
@@ -349,24 +432,46 @@ export class Quests {
     const G = this.g;
     this.offerDay = G.sky.day;
     for (const npc of ['mags', 'tallow']) { const list = []; for (let i = 0; i < 3; i++) list.push(this.freshOffer(npc, list)); this.offers[npc] = list; }
+    for (const npc of NEW_GIVERS) { this.offers[npc] = []; this.fillNewOffers(npc); }
     if (!force) G.ui.pickup('New contracts on the boards');
+  }
+  fillNewOffers(npc) {
+    const list = this.offers[npc];
+    for (let i = list.length; i < GIVER_KINDS[npc].length; i++) {
+      let offer = null;
+      for (let tries = 0; tries < 24; tries++) {
+        const candidate = this.genOffer(npc);
+        if (candidate && !list.some((o) => o.kind === candidate.kind)) { offer = candidate; break; }
+      }
+      if (!offer) break;
+      list.push(offer);
+    }
   }
   accept(npc, oid) {
     const G = this.g;
     if (this.active.length >= 3) { G.ui.toast('Too many contracts', 'Finish or abandon one first. You can hold three.', 'bad'); return false; }
-    const o = this.offers[npc].find((x) => x.oid === oid);
+    const o = (this.offers[npc] || []).find((x) => x.oid === oid);
     if (!o) return false;
+    if (GIVER_KINDS[npc] && (this.active.some((q) => q.kind === o.kind) || (o.kind !== 'privateer' && Object.values(this.camps).some((c) => c.island === o.island && c.active && !c.cleared)))) {
+      G.ui.toast('Contract unavailable', 'Finish or abandon the conflicting contract, or return when the boards refresh.', 'bad');
+      return false;
+    }
     let q = null;
     if (o.kind === 'chart') q = this.makeChart(npc, o.torn);
-    else if (o.kind === 'bounty') {
+    else if (['bounty', 'territory', 'escape', 'rescue'].includes(o.kind)) {
       const camp = G.world.buildCamp(o.island, Math.random, true);
       const id = 'c' + this.nextId++;
       this.camps[id] = { id, island: o.island, x: camp.x, z: camp.z, y: camp.y, fire: camp.fire, total: 4 + Math.min(4, this.level()), killed: 0, captainDead: false, active: true, cleared: false };
-      q = { id: 'q' + this.nextId++, kind: 'bounty', giver: npc, camp: id, island: o.island, title: o.title, reward: o.reward, state: 'active' };
+      q = { id: 'q' + this.nextId++, kind: o.kind, giver: npc, camp: id, island: o.island, title: o.title, reward: o.reward, state: 'active' };
+      if (o.kind === 'rescue') q.survivor = { x: camp.x, y: camp.y, z: camp.z, hp: 100 };
       this.camps[id].quest = q.id;
     } else if (o.kind === 'delivery') {
       q = { id: 'q' + this.nextId++, kind: 'delivery', giver: npc, cargo: o.cargo, to: o.to, title: o.title, reward: o.reward, state: 'active' };
       this.give(o.cargo);
+    } else if (o.kind === 'prophecy') {
+      const t = G.world.placeTreasure(Math.random, o.island, true);
+      q = { id: 'q' + this.nextId++, kind: o.kind, giver: npc, island: o.island, title: o.title, reward: o.reward, state: 'active',
+        x: t.x, y: t.y, z: t.z, cx: t.x + Math.round((Math.random() - 0.5) * 16), cz: t.z + Math.round((Math.random() - 0.5) * 16) };
     } else {
       q = { id: 'q' + this.nextId++, ...o, state: 'active' };
       delete q.oid; delete q.desc;
@@ -377,7 +482,8 @@ export class Quests {
     this.active.push(q);
     if (this.tracked === 'story' && this.done) this.tracked = q.id;
     this.offers[npc] = this.offers[npc].filter((x) => x.oid !== oid);
-    this.offers[npc].push(this.freshOffer(npc, this.offers[npc]));
+    if (GIVER_KINDS[npc]) this.fillNewOffers(npc);
+    else this.offers[npc].push(this.freshOffer(npc, this.offers[npc]));
     G.sfx.place();
     return true;
   }
@@ -385,14 +491,16 @@ export class Quests {
     const q = this.active.find((x) => x.id === id);
     if (!q) return;
     if (q.kind === 'delivery') this.take(q.cargo);
-    if (q.kind === 'bounty' && this.camps[q.camp]) this.camps[q.camp].active = false;
+    if (q.camp && this.camps[q.camp]) this.camps[q.camp].active = false;
     this.active = this.active.filter((x) => x.id !== id);
     if (this.tracked === id) this.tracked = 'story';
+    for (const giver of NEW_GIVERS) this.fillNewOffers(giver);
   }
   turnIn(id, npc) {
     const G = this.g;
     const q = this.active.find((x) => x.id === id);
     if (!q) return;
+    if (q.kind === 'delivery' ? q.to !== npc || q.state === 'lost' : q.giver !== npc || q.state !== 'ready') return;
     if (q.kind === 'expedition') {
       if (q.state !== 'ready') return;
       const island = G.world.islands[q.island];
@@ -407,6 +515,7 @@ export class Quests {
     if (this.tracked === id) this.tracked = 'story';
     this.stats.contracts++; G.level++;
     this.pay(q.reward, `${NAMES[npc]} pays for “${q.title}”.`);
+    for (const giver of NEW_GIVERS) this.fillNewOffers(giver);
     G.autosave('contract');
   }
   contractObjective(q) {
@@ -419,6 +528,24 @@ export class Quests {
       case 'hunt': { if (q.state === 'ready') return { text: `Claim the bounty from ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) }; const h = G.hollowFor(q.id); return { text: h ? 'Sink the Hollow Wake' : 'Take your sloop out to open water', marker: h ? { x: h.pos.x, z: h.pos.z, icon: 'enemy' } : null }; }
       case 'explore': { if (q.state === 'ready') return { text: 'Show your finished chart to Old Mags', marker: this.npcMarker('mags') }; return { text: `Chart every island: ${this.discovered.length}/${G.world.islands.length}`, marker: this.nearestUncharted() }; }
       case 'expedition': { const island = G.world.islands[q.island]; if (q.state === 'ready') return { text: `Report your findings from ${island ? island.name : 'the outer island'} to ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) }; return { text: `Sail close to ${island ? island.name : 'the marked island'} to chart it`, marker: island ? { x: island.x, z: island.z, icon: 'chart' } : null }; }
+      case 'territory':
+      case 'escape': {
+        const c = this.camps[q.camp];
+        if (q.state === 'ready') return { text: `Report to ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) };
+        let text;
+        if (q.kind === 'territory') text = c && c.cleared ? `Hold the camp on foot: ${Math.floor(q.held || 0)}/60 seconds` : `Defeat the camp captain on ${this.iname(q.island)}`;
+        else text = q.entered ? `Board your ship and sail 100 paces clear: ${Math.max(0, Math.ceil(90 - q.elapsed))}s` : `Reach the camp on ${this.iname(q.island)} on foot`;
+        return { text, marker: c ? { x: c.x, z: c.z, icon: 'skull' } : null };
+      }
+      case 'rescue': {
+        const c = this.camps[q.camp], s = q.survivor;
+        if (q.state === 'ready') return { text: `Report to ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) };
+        if (q.state === 'lost') return { text: 'The sailor fell. Abandon this contract.' };
+        const text = q.escorting ? `Escort the sailor to your ship; keep them safe (${s.hp}/100)` : c && c.cleared ? 'Speak to the stranded sailor' : `Defeat the camp captain on ${this.iname(q.island)}`;
+        return { text, marker: s ? { x: s.x, z: s.z, icon: 'npc' } : null };
+      }
+      case 'prophecy': return q.state === 'ready' ? { text: `Report to ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) } : { text: `Find the marked X within the circle on ${this.iname(q.island)} and dig beneath it`, marker: { x: q.cx, z: q.cz, icon: 'x', r: 12 } };
+      case 'privateer': return q.state === 'ready' ? { text: `Claim your pay from ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) } : { text: `Sink pirate ships: ${q.sunk || 0}/2` };
       default: return { text: q.title };
     }
   }
@@ -462,6 +589,12 @@ export class Quests {
       this.give('page3');
       G.ui.toast('A buried page', 'Page III of the Hollow captain’s log, wrapped in oilcloth.', 'curse');
       return { gold: 40, cursed: false, story: true };
+    }
+    const prophecy = this.active.find((q) => q.kind === 'prophecy' && q.state === 'active' && q.x === x && q.y === y && q.z === z);
+    if (prophecy) {
+      prophecy.state = 'ready';
+      G.ui.toast('The buried answer', `The Seer’s vision was true. Report to ${NAMES[prophecy.giver]}.`, 'good');
+      return { gold: 0, cursed: false, story: true };
     }
     const q = this.active.find((c) => c.kind === 'chart' && c.x === x && c.z === z);
     if (q) {
@@ -511,6 +644,11 @@ export class Quests {
     const G = this.g;
     if (ship.variant === 'flagship' && this.id === 'vault' && this.phase === 1) { this.phase = 2; G.ui.toast('The flagship is sunk', 'Take the Heart to Brother Tallow.', 'chapter'); }
     if (ship.huntId) { const q = this.active.find((c) => c.id === ship.huntId); if (q) { q.state = 'ready'; G.ui.toast('Bounty complete', 'Brother Tallow will pay for this.', 'good'); } }
+    if (ship.kind === 'pirate') for (const q of this.active) {
+      if (q.kind !== 'privateer' || q.state !== 'active') continue;
+      q.sunk = Math.min(2, (q.sunk || 0) + 1);
+      if (q.sunk >= 2) { q.state = 'ready'; G.ui.toast('Commission complete', `Report to ${NAMES[q.giver]}.`, 'good'); }
+    }
   }
   onBank(amount) { if (this.id === 'firsthaul' && this.phase === 1 && amount > 0) this.advance(); }
   onPlayerDeath() {
@@ -519,6 +657,11 @@ export class Quests {
     for (const c of ['oil', 'rum', 'candles']) if (G.inv[c] > 0) { lost.push(ITEMS[c].name.toLowerCase()); G.inv[c] = 0; }
     if (this.id === 'oil' && this.phase === 1) this.phase = 0;
     for (const q of this.active) if (q.kind === 'delivery') q.state = 'lost';
+    for (const q of this.active) {
+      if (q.kind === 'territory' && q.state === 'active') q.held = 0;
+      if (q.kind === 'escape' && q.state === 'active') q.entered = false;
+      if (q.kind === 'rescue' && q.state === 'active' && q.escorting) { q.state = 'lost'; if (this.camps[q.camp]) this.camps[q.camp].active = false; }
+    }
     if (lost.length) G.ui.toast('Cargo lost', `The sea took your ${lost.join(' and ')}.`, 'bad');
   }
   onKrakenDefeated() {
@@ -537,6 +680,24 @@ export class Quests {
     const G = this.g, st = this.id, ph = this.phase;
     const name = G.look.name;
     const d = { npc, greeting: '', story: null, shipwright: null, ready: [], offers: [], bank: npc === 'mags' && (G.gold > 0 || G.lootValue(G.inv) > 0), shop: npc === 'mags', rest: null };
+    if (npc.startsWith('survivor:')) {
+      const q = this.active.find((x) => x.kind === 'rescue' && `survivor:${x.id}` === npc && x.state === 'active');
+      const camp = q && this.camps[q.camp];
+      d.greeting = q && q.escorting ? 'I am following you. Stay close, and keep the Hollowmen away. Your ship is our way out.' : 'The Hollowmen trapped me here. Their captain will not let me leave. Please stop him.';
+      if (q && camp && camp.cleared && !q.escorting) d.story = { text: 'The sailor is ready to follow you to your ship. Stay close and protect them from pursuing Hollowmen.', button: 'Lead the sailor to safety', act: () => { q.escorting = true; q.waveTimer = 0; G.ui.toast('Rescue underway', 'Stay close to the sailor and lead them to your ship.', 'good'); } };
+      return d;
+    }
+    if (GIVER_KINDS[npc]) {
+      const lines = {
+        ironhook: 'My hideout is mine because I fight for it. Pirate rivals have a price on their sails. Sink them and I will pay in honest coin. Or prove you can outrun the dead ashore.',
+        blackstone: 'Fort Brackwater has not forgotten its duty. The dead keep raising camps across these waters. Clear their captain and hold the ground against their counterattack. Pirate raiders are fair targets too.',
+        seer: 'The tide carries visions to this lonely shore. I see an island waiting beyond the mist. Sail there and return with what you have seen. Even a warning is worth following, if you can escape it.',
+      };
+      d.greeting = lines[npc];
+      d.ready = this.active.filter((q) => q.giver === npc && q.state === 'ready');
+      d.offers = this.offers[npc] || [];
+      return d;
+    }
     if (npc === 'mags') {
       d.greeting = G.sky.isNight ? `Up late, ${name}? The Hollowmen walk at night. Keep to the lantern light.` : `Ahoy, ${name}. Gold is safer in my strongbox than in your pockets.`;
       if (st === 'landfall') d.greeting = `So you’re the new captain. Chop some wood, craft planks, then take that sloop out. I marked an X for you on ${this.iname(G.world.firstMap.island)}.`;
