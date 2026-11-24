@@ -171,14 +171,14 @@ export class Game {
   }
   // Auto lowers resolution first; sustained headroom restores it without changing the preset.
   perf(dt) {
-    if (this.state !== 'play' || dt <= 0 || dt > 1 || document.hidden) { this.perfT = 0; this.perfFrames = 0; this.slowT = 0; this.fastT = 0; return; }
-    this.perfT += dt; this.perfFrames++;
+    if (this.state !== 'play' || dt <= 0 || document.hidden) { this.perfT = 0; this.perfFrames = 0; this.slowT = 0; this.fastT = 0; return; }
+    this.perfT += Math.min(dt, 1); this.perfFrames++;
     if (this.perfT < 2) return;
     const fps = this.perfFrames / this.perfT;
     this.perfT = 0; this.perfFrames = 0;
     if (this.settings.get('quality') !== 'auto') { this.slowT = 0; this.fastT = 0; return; }
     this.slowT = fps < 28 ? this.slowT + 2 : 0;
-    this.fastT = fps > 55 ? this.fastT + 2 : 0;
+    this.fastT = fps >= 29 ? this.fastT + 2 : 0;
     const i = QUALITY_ORDER.indexOf(this.autoQ);
     if (this.slowT >= 6) {
       this.slowT = 0;

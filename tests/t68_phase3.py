@@ -51,17 +51,25 @@ async def main():
               const base = g.renderer.getPixelRatio();
               for (let i = 0; i < 65; i++) g.perf(0.1);
               const slow = [g.resScale, g.renderer.getPixelRatio(), g.autoQ];
-              for (let i = 0; i < 1000; i++) g.perf(1 / 60);
+              for (let i = 0; i < 500; i++) g.perf(1 / 30);
               const fast = [g.resScale, g.renderer.getPixelRatio()];
+              g.state = 'title';
               g.perf(2);
               const paused = [g.perfT, g.slowT, g.fastT];
+              g.state = 'play';
+              for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 40; j++) g.perf(0.1);
+                g.perf(1.1);
+              }
+              const stalls = g.resScale;
+              g.resScale = 1; g.perfT = g.perfFrames = g.slowT = g.fastT = 0; g.applySettings();
               for (let i = 0; i < 330; i++) g.perf(0.1);
               const floor = [g.resScale, g.autoQ];
               g.settings.v.quality = 'low'; g.applySettings();
               for (let i = 0; i < 100; i++) g.perf(0.1);
               const manual = [g.resScale, g.qualityName()];
               g.settings.v.quality = oldQuality; g.state = oldState; g.applySettings();
-              return {right, left, center, same, turned, audio, base, slow, fast, paused, floor, manual};
+              return {right, left, center, same, turned, audio, base, slow, fast, paused, stalls, floor, manual};
             }''')
             assert result['right'] > 0.99 and result['left'] < -0.99
             assert abs(result['center']) < 0.001 and result['same'] == 0
@@ -75,6 +83,7 @@ async def main():
             assert result['slow'][0] == 0.9 and result['slow'][1] < result['base'] and result['slow'][2] == 'high'
             assert result['fast'][0] == 1 and abs(result['fast'][1] - result['base']) < 0.001
             assert result['paused'] == [0, 0, 0]
+            assert result['stalls'] < 1
             assert result['floor'] == [0.65, 'medium']
             assert result['manual'] == [1, 'low']
             errors = [line for line in logs if line.startswith('[error]') or line.startswith('[pageerror]')]
