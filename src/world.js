@@ -313,6 +313,18 @@ export class World {
     this.moreIslands();
     this.frontierIslands();
     this.extendedIslands();
+    for (const [id, name] of [['ironhook', 'Smuggler’s Hollow'], ['seer', 'Marrow Cay'], ['blackstone', 'Fort Brackwater']]) {
+      const island = this.islands.findIndex((o) => o.name === name), o = this.islands[island];
+      if (!o) continue;
+      for (let r = 0.65; r <= 0.95 && !this.sites[id]; r += 0.1) for (let a = 0; a < 32 && !this.sites[id]; a++) {
+        const x = Math.floor(o.x + Math.cos(a * Math.PI / 16) * o.r * r), z = Math.floor(o.z + Math.sin(a * Math.PI / 16) * o.r * r);
+        if (!this.inside(x, 0, z) || this.islandOf[x + z * W] !== island || this.isReserved(x, z, 3)) continue;
+        const y = this.topSolid(x, z) + 1, ground = this.get(x, y - 1, z);
+        if (y <= SEA + 1 || ![B.GRASS, B.SAND, B.DIRT, B.STONE, B.SLATE].includes(ground)) continue;
+        if (this.solid(x, y, z) || this.solid(x, y + 1, z)) continue;
+        this.sites[id] = { x: x + 0.5, y, z: z + 0.5 };
+      }
+    }
     for (const s of this.sites.structures) {
       if (s.type !== 'house') continue;
       const x = Math.floor(s.doorX), z = Math.floor(s.doorZ);

@@ -1,10 +1,10 @@
-import { ITEMS, RECIPES, LOOKS } from './config.js';
+import { ITEMS, RECIPES, LOOKS, W, D } from './config.js';
 import { itemIcon } from './ui.js';
 import { randomLook } from './character.js';
 import { UPGRADES, SUPPLIES, VESSELS, vesselProgress } from './shop.js';
 
 // Every menu in the game is a parchment "sheet" laid over the live world.
-const NAMES = { mags: 'Old Mags', tallow: 'Brother Tallow' };
+const NAMES = { mags: 'Old Mags', tallow: 'Brother Tallow', ironhook: 'Captain Ironhook', seer: 'Mystic Seer', blackstone: 'Admiral Blackstone' };
 const SLOT_NAMES = { auto: 'Autosave', s1: 'Slot 1', s2: 'Slot 2', s3: 'Slot 3' };
 
 function h(tag, props, ...kids) {
@@ -152,10 +152,27 @@ export class Sheets {
       this.drawMap();
     }, 'btn small ghost');
     expand.setAttribute('aria-pressed', String(large));
-    this.paper.append(h('div', { class: 'row' }, expand), this.mapCv, this.mapNote, h('p', { class: 'muted', text: 'Red X: treasure. Dashed circle: a torn chart, so search inside it. Dots mark people, camps, bottles and ships. Grey islands are still uncharted.' }));
+    this.paper.append(h('div', { class: 'row' }, expand), this.mapCv, this.mapNote, h('p', { class: 'muted', text: 'Red X: treasure. Dashed circle: a torn chart. In solo survival, the blue circle is the boundary and gold squares are timed supply drops.' }));
     this.drawMap();
   }
-  drawMap() { if (this.mapCv) this.g.ui.drawMap(this.mapCv, this.mapNote); }
+  drawMap() {
+    if (!this.mapCv) return;
+    this.g.ui.drawMap(this.mapCv, this.mapNote);
+    const br = this.g.battleRoyale;
+    if (!br || !br.active) return;
+    const cv = this.mapCv, x = cv.getContext('2d'), sx = cv.width / W, sz = cv.height / D;
+    x.save();
+    x.strokeStyle = '#007d9b'; x.lineWidth = 3; x.setLineDash([8, 5]);
+    x.beginPath(); x.ellipse(br.x * sx, br.z * sz, br.radius * sx, br.radius * sz, 0, 0, Math.PI * 2); x.stroke();
+    x.setLineDash([]);
+    for (const drop of br.drops) {
+      x.fillStyle = '#d79000'; x.strokeStyle = '#1b2a30'; x.lineWidth = 2;
+      x.fillRect(drop.x * sx - 5, drop.z * sz - 5, 10, 10);
+      x.strokeRect(drop.x * sx - 5, drop.z * sz - 5, 10, 10);
+    }
+    x.restore();
+    this.mapNote.textContent = `Solo survival · phase ${br.phase + 1}/4 · ${br.stage} · ${Math.ceil(300 - br.elapsed)}s left. Gold crates fall, then expire after two minutes.`;
+  }
 
   // ---------------------------------------------------------------- bag and crafting
   // your sea chest aboard the sloop: stow things, take them back
@@ -351,7 +368,7 @@ export class Sheets {
       this.btn('Save', () => G.openSheet('saves', { mode: 'save' }), 'btn ghost'),
       this.btn('Load', () => G.openSheet('saves', { mode: 'load' }), 'btn ghost'),
       this.btn('Customize captain & ship', () => G.openSheet('captain', {}), 'btn ghost'),
-      G.net.available || G.net.role ? this.btn(G.net.role === 'host' ? `Crew · ${G.net.crew.size}` : G.net.inCrew ? 'Crew · aboard' : 'Crew', () => G.openSheet('crew'), 'btn ghost') : null,
+      !G.battleRoyale && (G.net.available || G.net.role) ? this.btn(G.net.role === 'host' ? `Crew · ${G.net.crew.size}` : G.net.inCrew ? 'Crew · aboard' : 'Crew', () => G.openSheet('crew'), 'btn ghost') : null,
       this.btn('Settings', () => G.openSheet('settings', {}), 'btn ghost'),
       this.btn('How to play', () => G.openSheet('help', {}), 'btn ghost'),
       this.btn('Replay voyage guide', () => G.replayTutorial(), 'btn ghost'),
@@ -512,8 +529,11 @@ export class Sheets {
       form.append(this.swatches('Coat', LOOKS.coat.map((c) => c.c), L.coat, (i) => upd('coat', i), LOOKS.coat.map((c) => c.name)));
       form.append(this.optRow('Eyes', [[false, 'Both eyes'], [true, 'Eye patch']], !!L.patch, (v) => upd('patch', v)));
       if (fresh) {
+        this.opts.mode ||= 'voyage';
+        form.append(this.optRow('Mode', [['voyage', 'Voyage'], ['royale', 'Solo battle royale']], this.opts.mode, (v) => { this.opts.mode = v; this.render(); }));
+        if (this.opts.mode === 'royale') form.append(h('p', { class: 'muted', text: 'Solo survival, not multiplayer: survive five minutes as the circle shrinks. Death ends the challenge; afterwards you respawn for exploration. Menus pause the challenge.' }));
         if (this.opts.showGuide == null) this.opts.showGuide = true;
-        form.append(this.check('Show the optional first-voyage guide', this.opts.showGuide, (v) => { this.opts.showGuide = v; }));
+        if (this.opts.mode === 'voyage') form.append(this.check('Show the optional first-voyage guide', this.opts.showGuide, (v) => { this.opts.showGuide = v; }));
       }
     } else {
       form.append(this.textField('Ship name', L.ship, 26, (v) => { L.ship = v || 'The Salt Wren'; G.applyLook('ship'); }));
@@ -522,12 +542,24 @@ export class Sheets {
       form.append(this.optRow('Emblem', LOOKS.emblem.map((e, i) => [i, e]), L.emblem, (i) => upd('emblem', i)));
     }
     this.paper.append(form);
-    if (fresh) this.paper.append(h('p', { class: 'muted', text: 'A new voyage replaces your autosave. Voyages saved in numbered slots are kept.' }));
+    if (fresh) this.paper.append(h('p', { class: 'muted', text: this.opts.mode === 'royale' ? 'A new challenge replaces the separate solo challenge autosave, not your voyage autosave or numbered slots.' : 'A new voyage replaces your autosave. Voyages saved in numbered slots are kept.' }));
     const row = h('div', { class: 'row stick' });
     row.append(this.btn('Shuffle', () => { const keep = { name: L.name, ship: L.ship }; Object.assign(L, randomLook(), keep); G.applyLook('all'); this.render(); }, 'btn ghost'));
-    if (fresh) { row.append(this.btn('Back', () => G.closeSheet(), 'btn ghost'), this.btn('Set sail', () => G.beginVoyage(L, this.opts.showGuide))); }
+    if (fresh) {
+      row.append(this.btn('Back', () => G.closeSheet(), 'btn ghost'));
+      if (this.opts.mode === 'royale') row.append(this.btn('Resume solo challenge', () => G.loadSlot('royale'), 'btn ghost'));
+      row.append(this.btn('Set sail', () => G.beginVoyage(L, this.opts.showGuide, this.opts.mode)));
+    }
     else row.append(this.btn('Done', () => { G.autosave('look', true); G.openSheet('menu'); }));
     this.paper.append(row);
+  }
+
+  r_royaleResult() {
+    const G = this.g, won = G.battleRoyale?.result === 'won';
+    this.paper.append(this.head('Solo survival challenge', won ? 'Challenge survived' : 'Challenge lost'));
+    this.paper.append(h('p', { text: won ? 'You survived the shrinking circle for five minutes.' : 'Death ended the challenge. You have respawned to explore; this match cannot be resumed.' }));
+    this.paper.append(h('p', { class: 'muted', text: 'No rival players are simulated. Start a new challenge from the title screen to reset.' }));
+    this.paper.append(h('div', { class: 'row' }, this.btn('Continue exploring', () => G.closeSheet()), this.btn('Quit to title', () => G.quitToTitle(), 'btn ghost')));
   }
 
   // ---------------------------------------------------------------- the end
