@@ -470,6 +470,7 @@ export class Sheets {
     form.append(this.check('Invert looking up and down', S.get('invertY'), (v) => set('invertY', v)));
     form.append(this.check('Music', S.get('music'), (v) => set('music', v)));
     form.append(this.check('Show frames per second', S.get('fps'), (v) => set('fps', v)));
+    form.append(this.check('Storm Royale: a closing storm circle (this session)', G.royale.active, (v) => G.royale.setActive(v)));
     this.paper.append(form);
     const q = G.qualityName();
     this.paper.append(h('p', { class: 'muted', text: S.get('quality') === 'auto' ? `Auto is using ${q} quality on this device and steps down if the game runs slowly.` : `Using ${q} quality.` }));
