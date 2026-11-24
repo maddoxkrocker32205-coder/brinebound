@@ -1,10 +1,10 @@
 // Player settings, kept per browser.
 const KEY = 'brinebound-settings';
 export const QUALITY = {
-  low: { shadows: 0, ratio: 1.25, clouds: true },
-  medium: { shadows: 1024, ratio: 1.5, clouds: true },
-  high: { shadows: 2048, ratio: 2, clouds: true },
-  ultra: { shadows: 4096, ratio: 2.5, clouds: true },
+  low: { shadows: 0, ratio: 1.5, clouds: true },
+  medium: { shadows: 1024, ratio: 2, clouds: true },
+  high: { shadows: 2048, ratio: 2.5, clouds: true },
+  ultra: { shadows: 4096, ratio: 3, clouds: true },
 };
 export const VIEW = { near: 100, normal: 140, far: 180 };
 export class Settings {

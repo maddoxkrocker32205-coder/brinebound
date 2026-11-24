@@ -11,6 +11,7 @@ import { Physics, kindOf } from './physics.js';
 import { Hook } from './hook.js';
 import { Builder, withoutPart } from './build.js';
 import { Fleet } from './fleet.js';
+import { Royale } from './royale.js';
 import { Crews, FACTIONS } from './crews.js';
 import { Guns, GUN_DEFS, isGun } from './guns.js';
 import { isCode, parts as pieceParts } from './pieces.js';
@@ -91,6 +92,7 @@ export class Game {
     this.hook = new Hook(this);
     this.builder = new Builder(this);
     this.fleet = new Fleet(this);
+    this.royale = new Royale(this);
     this.crews = new Crews(this);
     this.guns = new Guns(this);
     this.sfx = new Sfx();
@@ -817,6 +819,7 @@ export class Game {
     this.npcs.update(dt);
     if (crew) this.quests.chartNearby(dt); else this.quests.update(dt);
     this.weather.update(dt);
+    if (!crew) this.royale.update(dt);
     this.life.update(dt);
     this.fauna.update(dt);
     this.world.processDirty(3);
@@ -2034,6 +2037,7 @@ export class Game {
     return { gold, items };
   }
   onShipSunk(ship) {
+    this.royale.onShipSunk(ship);
     if (ship !== this.sloop && this.player.mode === 'deck' && this.player.ship === ship) this.player.leaveShip(ship);
     for (let k = 0; k < 4; k++) this.after(k * 0.5, () => this.physics.splinters(ship.pos.x + (Math.random() - 0.5) * 4, ship.pos.y + 1.5, ship.pos.z + (Math.random() - 0.5) * 8, ship.hullHex || 0x6b4426, 8, 5));
     if (ship === this.sloop) {
@@ -2138,6 +2142,7 @@ export class Game {
   }
   onPlayerDeath() {
     const P = this.player;
+    this.royale.onPlayerDeath();
     if (P.mode === 'helm') { if (this.net.inCrew) this.net.leaveHelm(); else if (this.sloop) this.sloop.sailLvl = 0; }
     const lost = this.gold, lostLoot = this.dropLoot();
     this.gold = 0;
