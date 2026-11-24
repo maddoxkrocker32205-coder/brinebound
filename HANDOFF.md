@@ -1,6 +1,6 @@
 # Brinebound: hand-off guide
 
-Version 0.6.42. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
+Version 0.6.43. Read this first if you are an AI assistant (or a person) picking up the project. It explains what the game is, how to build it, where everything lives, and the rules the codebase follows.
 
 ## Starter prompt
 

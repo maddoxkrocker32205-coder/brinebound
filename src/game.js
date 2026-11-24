@@ -2049,6 +2049,7 @@ export class Game {
     }
     this.stats.ships++;
     if (ship.kind !== 'hollow') {
+      this.quests.onFleetShipSunk(ship);
       const L = Math.min(10, this.level), k = ship.kind;
       const loot = k === 'merchant' ? 80 + L * 20 : k === 'navy' ? 140 + L * 25 : 100 + L * 25;
       this.props.spawnLoot(ship.pos.x, ship.pos.z, loot, 0, 0xffd27a);
