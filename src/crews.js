@@ -219,7 +219,7 @@ export class Crews {
     G.guns.tracers.add(from, to, 0.016);
     const d = to.clone().sub(from).normalize();
     G.guns.flash(from.x + d.x * 0.6, from.y + d.y * 0.6, from.z + d.z * 0.6, { pellets: 1 }, d);
-    G.sfx.gun && G.sfx.gun('musket', G.distToListener(from.x, from.z));
+    G.sfx.gun && G.sfx.gun('musket', G.distToListener(from.x, from.z), G.panToListener(from.x, from.z));
   }
   // stairs and the hatch: where to head next to get from one deck to another
   waypoint(s, from, to) {

@@ -54,32 +54,40 @@ export class Sfx {
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + a);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + dcy);
   }
-  nz(type, freq, q, peak, a, dcy, vol = 1) {
+  output(pan) {
+    if (!this.ctx || !this.master || !pan || !this.ctx.createStereoPanner) return this.master;
+    const p = this.ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    p.connect(this.master);
+    return p;
+  }
+  nz(type, freq, q, peak, a, dcy, vol = 1, output = this.master) {
     const c = this.ctx;
     if (!c || !this.on || vol <= 0.01) return;
     const t = c.currentTime;
     const src = c.createBufferSource(); src.buffer = this.noise; src.playbackRate.value = 0.7 + Math.random() * 0.6;
     const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
     const g = c.createGain(); this.env(g, t, a, peak * vol, dcy);
-    src.connect(f).connect(g).connect(this.master);
+    src.connect(f).connect(g).connect(output);
     src.start(t, Math.random()); src.stop(t + a + dcy + 0.05);
   }
-  tone(type, f0, f1, peak, a, dcy, vol = 1, delay = 0) {
+  tone(type, f0, f1, peak, a, dcy, vol = 1, delay = 0, output = this.master) {
     const c = this.ctx;
     if (!c || !this.on || vol <= 0.01) return;
     const t = c.currentTime + delay;
     const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t);
     if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + a + dcy);
     const g = c.createGain(); this.env(g, t, a, peak * vol, dcy);
-    o.connect(g).connect(this.master); o.start(t); o.stop(t + a + dcy + 0.05);
+    o.connect(g).connect(output); o.start(t); o.stop(t + a + dcy + 0.05);
   }
   vol(d) { return Math.max(0, 1 - d / 150); }
-  boom(d = 0) { const v = this.vol(d); this.tone('sine', 95, 30, 0.9, 0.005, 0.75, v); this.nz('lowpass', 520, 0.7, 0.9, 0.004, 0.9, v); this.nz('bandpass', 1900, 1, 0.25, 0.002, 0.14, v); }
-  gun(kind, d = 0) {
+  boom(d = 0, pan = 0) { const v = this.vol(d), out = v > 0.01 && this.on ? this.output(pan) : this.master; this.tone('sine', 95, 30, 0.9, 0.005, 0.75, v, 0, out); this.nz('lowpass', 520, 0.7, 0.9, 0.004, 0.9, v, out); this.nz('bandpass', 1900, 1, 0.25, 0.002, 0.14, v, out); }
+  gun(kind, d = 0, pan = 0) {
     const v = this.vol(d * 0.7);
-    if (kind === 'blunder') { this.nz('lowpass', 1500, 0.7, 0.95, 0.002, 0.4, v); this.nz('highpass', 1200, 0.8, 0.5, 0.001, 0.12, v); this.tone('sine', 120, 42, 0.55, 0.003, 0.32, v); }
-    else if (kind === 'musket') { this.nz('highpass', 950, 0.7, 0.85, 0.001, 0.2, v); this.nz('lowpass', 750, 0.8, 0.6, 0.002, 0.55, v); this.tone('sine', 150, 48, 0.4, 0.002, 0.28, v); }
-    else { this.nz('highpass', 1700, 0.8, 0.75, 0.001, 0.13, v); this.nz('lowpass', 950, 0.8, 0.45, 0.002, 0.28, v); this.tone('sine', 190, 60, 0.3, 0.002, 0.16, v); }
+    const out = v > 0.01 && this.on ? this.output(pan) : this.master;
+    if (kind === 'blunder') { this.nz('lowpass', 1500, 0.7, 0.95, 0.002, 0.4, v, out); this.nz('highpass', 1200, 0.8, 0.5, 0.001, 0.12, v, out); this.tone('sine', 120, 42, 0.55, 0.003, 0.32, v, 0, out); }
+    else if (kind === 'musket') { this.nz('highpass', 950, 0.7, 0.85, 0.001, 0.2, v, out); this.nz('lowpass', 750, 0.8, 0.6, 0.002, 0.55, v, out); this.tone('sine', 150, 48, 0.4, 0.002, 0.28, v, 0, out); }
+    else { this.nz('highpass', 1700, 0.8, 0.75, 0.001, 0.13, v, out); this.nz('lowpass', 950, 0.8, 0.45, 0.002, 0.28, v, out); this.tone('sine', 190, 60, 0.3, 0.002, 0.16, v, 0, out); }
   }
   splash(d = 0) { this.nz('bandpass', 850, 0.8, 0.4, 0.01, 0.5, this.vol(d)); }
   crash(d = 0) { const v = this.vol(d); this.nz('highpass', 1300, 0.8, 0.5, 0.003, 0.35, v); this.tone('triangle', 150, 70, 0.3, 0.004, 0.3, v); }

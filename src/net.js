@@ -929,7 +929,7 @@ export class Net {
         G.projectiles.spawn(num(v[0], -50, W + 50), num(v[1], -10, 80), num(v[2], -50, D + 50), num(v[3], -80, 80), num(v[4], -80, 80), num(v[5], -80, 80), owner, 1, true);
         if (owner) G.particles.burst(v[0], v[1], v[2], 0xffb347, 6, 2.5, 1.5, 0, 0.18, 0.2);
         const t = performance.now();
-        if (t - this.boomAt > 250) { this.boomAt = t; G.sfx.boom(G.distToListener(v[0], v[2])); }
+        if (t - this.boomAt > 250) { this.boomAt = t; G.sfx.boom(G.distToListener(v[0], v[2]), G.panToListener(v[0], v[2])); }
         break;
       }
       default: break;
