@@ -306,7 +306,7 @@ export class Quests {
       return { oid, kind: 'expedition', giver: npc, island: i, title: `Outer Reach: ${island.name}`, desc: note, reward: 180 + L * 20 };
     };
     if (npc === 'mags') {
-      const kinds = ['chart', 'chart', 'supply', 'rum'];
+      const kinds = ['chart', 'chart', 'supply', 'rum', 'privateer'];
       if (!this.flags.exploreOffered && this.discovered.length < this.g.world.islands.length) kinds.push('explore');
       if (frontier.length) kinds.push('expedition');
       const k = pick(kinds);
@@ -316,11 +316,12 @@ export class Quests {
         const need = { plank: 16, stone: 12, coconut: 6, brick: 10, wood: 10 }[item];
         return { oid, kind: 'supply', giver: npc, item, need, title: `Supply order: ${need} ${ITEMS[item].name.toLowerCase()}`, desc: 'The trading post is running low. Bring the goods and I pay on the nail.', reward: 90 + L * 12 };
       }
+      if (k === 'privateer') { const need = 1 + (L > 3 ? 1 : 0) + (L > 7 ? 1 : 0); return { oid, kind: 'privateer', giver: npc, target: 'pirate', need, n: 0, title: `Privateer: sink ${need} pirate ${need > 1 ? 'ships' : 'ship'}`, desc: 'Raiders are bleeding the trade lanes dry. Sink them and I pay a privateer’s fee.', reward: 200 + need * 90 + L * 15 }; }
       if (k === 'explore') return { oid, kind: 'explore', giver: npc, title: 'Chart the Brine', desc: 'Sail close to every island in the archipelago so your chart is complete.', reward: 300 };
       if (k === 'expedition') return expedition();
       return { oid, kind: 'delivery', giver: npc, cargo: 'rum', to: 'tallow', title: 'Rum for the lighthouse', desc: 'Brother Tallow says it’s for the lamps. Deliver the barrel to Lantern Cay and don’t drink it.', reward: 140 + L * 15 };
     }
-    const kinds = ['bounty', 'bounty', 'hunt', 'candles', 'bones'];
+    const kinds = ['bounty', 'bounty', 'hunt', 'candles', 'bones', 'purge'];
     if (frontier.length) kinds.push('expedition');
     const k = pick(kinds);
     if (k === 'expedition') return expedition();
@@ -330,6 +331,7 @@ export class Quests {
       return { oid, kind: 'bounty', giver: npc, island: isl, title: `Bounty: Hollowmen on ${this.iname(isl)}`, desc: 'A new camp has risen. Put down their captain and the rest will crumble.', reward: 220 + L * 25 };
     }
     if (k === 'hunt') return { oid, kind: 'hunt', giver: npc, title: 'Sink the Hollow Wake', desc: 'Raise your sails and she will come for you. Send her back to the deep.', reward: 260 + L * 25 };
+    if (k === 'purge') { const need = 8 + Math.min(8, L); return { oid, kind: 'purge', giver: npc, need, n: 0, title: `Purge: put down ${need} Hollowmen`, desc: 'The dead walk too freely. Cut down any Hollowmen you meet, on any island, and the light burns easier.', reward: 120 + need * 14 + L * 10 }; }
     if (k === 'bones') return { oid, kind: 'supply', giver: npc, item: 'bone', need: 8, title: 'Bones for the candles', desc: 'Hollowmen bones burn bright and long. Bring me eight.', reward: 110 + L * 12 };
     return { oid, kind: 'delivery', giver: npc, cargo: 'candles', to: 'mags', title: 'Candles for Brine Haven', desc: 'Old Mags trades these for oil. Carry the box safely across.', reward: 130 + L * 15 };
   }
@@ -338,7 +340,7 @@ export class Quests {
     let o = null;
     for (let tries = 0; tries < 24; tries++) {
       o = this.genOffer(npc);
-      const clash = list.some((x) => x.title === o.title || (x.kind === o.kind && (o.kind === 'explore' || o.kind === 'hunt')));
+      const clash = list.some((x) => x.title === o.title || (x.kind === o.kind && (o.kind === 'explore' || o.kind === 'hunt' || o.kind === 'privateer' || o.kind === 'purge')));
       const busy = (o.kind === 'explore' && this.active.some((q) => q.kind === 'explore')) || (o.kind === 'hunt' && this.active.some((q) => q.kind === 'hunt'))
         || (o.kind === 'expedition' && this.active.some((q) => q.kind === 'expedition' && q.island === o.island));
       if (!clash && !busy) return o;
@@ -417,6 +419,8 @@ export class Quests {
       case 'delivery': return this.has(q.cargo) ? { text: `Deliver the ${ITEMS[q.cargo].name.toLowerCase()} to ${NAMES[q.to]}`, marker: this.npcMarker(q.to) } : { text: 'The cargo is lost. Abandon the contract.' };
       case 'bounty': { const c = this.camps[q.camp]; if (q.state === 'ready') return { text: `Claim the bounty from ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) }; return { text: `Defeat the Hollowmen captain on ${this.iname(q.island)}`, marker: c ? { x: c.x, z: c.z, icon: 'skull' } : null }; }
       case 'hunt': { if (q.state === 'ready') return { text: `Claim the bounty from ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) }; const h = G.hollowFor(q.id); return { text: h ? 'Sink the Hollow Wake' : 'Take your sloop out to open water', marker: h ? { x: h.pos.x, z: h.pos.z, icon: 'enemy' } : null }; }
+      case 'privateer': return q.state === 'ready' ? { text: `Claim your fee from ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) } : { text: `Sink pirate ships: ${q.n || 0}/${q.need}` };
+      case 'purge': return q.state === 'ready' ? { text: `Claim your pay from ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) } : { text: `Put down Hollowmen: ${q.n || 0}/${q.need}` };
       case 'explore': { if (q.state === 'ready') return { text: 'Show your finished chart to Old Mags', marker: this.npcMarker('mags') }; return { text: `Chart every island: ${this.discovered.length}/${G.world.islands.length}`, marker: this.nearestUncharted() }; }
       case 'expedition': { const island = G.world.islands[q.island]; if (q.state === 'ready') return { text: `Report your findings from ${island ? island.name : 'the outer island'} to ${NAMES[q.giver]}`, marker: this.npcMarker(q.giver) }; return { text: `Sail close to ${island ? island.name : 'the marked island'} to chart it`, marker: island ? { x: island.x, z: island.z, icon: 'chart' } : null }; }
       default: return { text: q.title };
@@ -487,8 +491,18 @@ export class Quests {
     G.ui.toast('An empty vault', 'Only a few coins left in the dust. +60 gold.', '');
     return true;
   }
+  progress(kind, ok) {
+    for (const q of this.active) {
+      if (q.kind !== kind || q.state !== 'active' || !ok(q)) continue;
+      q.n = (q.n || 0) + 1;
+      if (q.n >= q.need) { q.state = 'ready'; this.g.ui.toast('Contract complete', `Return to ${NAMES[q.giver]} for your pay.`, 'good'); }
+      else this.g.ui.pickup(`${q.title}: ${q.n}/${q.need}`);
+    }
+  }
+  onFleetShipSunk(ship) { this.progress('privateer', (q) => q.target === ship.kind); }
   onSkeletonKilled(sk) {
     const G = this.g;
+    this.progress('purge', () => true);
     const camp = sk.campId ? this.camps[sk.campId] : null;
     if (!camp) return;
     camp.killed++;
